@@ -2,9 +2,12 @@
 
 import { Wifi, Shield, Clock, Activity, Database } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { useI18n } from '../lib/i18n';
 
 export default function StatusBar() {
+  const { t } = useI18n();
   const [time, setTime] = useState('');
+
   useEffect(() => {
     const update = () => setTime(new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false }));
     update();
@@ -17,23 +20,23 @@ export default function StatusBar() {
       <div className="flex items-center gap-4">
         <span className="flex items-center gap-1.5">
           <Activity className="w-3 h-3 text-accent-green" />
-          <span className="text-accent-green">ENGINE ONLINE</span>
+          <span className="text-accent-green">{t('status.online')}</span>
         </span>
         <span className="flex items-center gap-1.5">
           <Database className="w-3 h-3" />
-          Multi-Source
+          {t('status.multiSource')}
         </span>
         <span className="flex items-center gap-1.5">
           <Shield className="w-3 h-3" />
-          VPN Ready
+          {t('status.vpn')}
         </span>
         <span className="flex items-center gap-1.5">
           <Wifi className="w-3 h-3" />
-          Incognito Mode
+          {t('status.incognito')}
         </span>
       </div>
       <div className="flex items-center gap-4">
-        <span>Amadeus + Deep-Links</span>
+        <span>{t('status.sources')}</span>
         <span className="flex items-center gap-1.5">
           <Clock className="w-3 h-3" />
           {time} UTC+3

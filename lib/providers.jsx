@@ -2,13 +2,14 @@
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useState } from 'react';
+import { I18nProvider } from './i18n';
 
 export default function Providers({ children }) {
   const [queryClient] = useState(() => new QueryClient({
     defaultOptions: {
       queries: {
-        staleTime: 2 * 60 * 1000, // 2 min
-        gcTime: 10 * 60 * 1000, // 10 min cache
+        staleTime: 5 * 60 * 1000,
+        gcTime: 10 * 60 * 1000,
         retry: 2,
         refetchOnWindowFocus: false,
       },
@@ -17,7 +18,9 @@ export default function Providers({ children }) {
 
   return (
     <QueryClientProvider client={queryClient}>
-      {children}
+      <I18nProvider>
+        {children}
+      </I18nProvider>
     </QueryClientProvider>
   );
 }

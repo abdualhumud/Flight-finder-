@@ -1,20 +1,17 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { CreditCard, Check, X, Star, ArrowRight, Wallet } from 'lucide-react';
+import { Check, X, Star, ArrowRight, Wallet } from 'lucide-react';
 import { creditCards } from '../../data/static';
 import { formatPrice } from '../../lib/utils';
+import { useI18n } from '../../lib/i18n';
 
 export default function WalletStrategy() {
+  const { t } = useI18n();
   const [selectedCard, setSelectedCard] = useState(null);
   const [spendTrackers, setSpendTrackers] = useState({});
 
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem('spend-trackers');
-      if (saved) setSpendTrackers(JSON.parse(saved));
-    } catch {}
-  }, []);
+  useEffect(() => { try { const s = localStorage.getItem('spend-trackers'); if (s) setSpendTrackers(JSON.parse(s)); } catch {} }, []);
 
   function updateSpend(cardId, amount) {
     const next = { ...spendTrackers, [cardId]: Number(amount) || 0 };
@@ -26,12 +23,10 @@ export default function WalletStrategy() {
     <div className="space-y-6 animate-slide-up">
       <div>
         <h2 className="text-2xl font-bold text-white flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-accent-amber/20 flex items-center justify-center">
-            <Wallet className="w-5 h-5 text-accent-amber" />
-          </div>
-          Wallet Strategy
+          <div className="w-10 h-10 rounded-xl bg-accent-amber/20 flex items-center justify-center"><Wallet className="w-5 h-5 text-accent-amber" /></div>
+          {t('wallet.title')}
         </h2>
-        <p className="text-sm text-gray-500 mt-1 ml-[52px]">Credit card comparison with points optimizer</p>
+        <p className="text-sm text-gray-500 mt-1 ms-[52px]">{t('wallet.subtitle')}</p>
       </div>
 
       <div className="glass rounded-xl overflow-hidden">
@@ -39,9 +34,13 @@ export default function WalletStrategy() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border-subtle">
-                {['Card', 'Annual Fee', 'Sign-up Bonus', 'Min Spend', 'Points/SAR', 'Lounge', 'Companion'].map(h => (
-                  <th key={h} className={`${h === 'Card' ? 'text-left' : 'text-center'} px-4 py-3 text-xs text-gray-500 font-medium uppercase tracking-wider`}>{h}</th>
-                ))}
+                <th className="text-start px-4 py-3 text-xs text-gray-500 font-medium uppercase tracking-wider">{t('wallet.card')}</th>
+                <th className="text-center px-4 py-3 text-xs text-gray-500 font-medium uppercase tracking-wider">{t('wallet.annualFee')}</th>
+                <th className="text-center px-4 py-3 text-xs text-gray-500 font-medium uppercase tracking-wider">{t('wallet.signupBonus')}</th>
+                <th className="text-center px-4 py-3 text-xs text-gray-500 font-medium uppercase tracking-wider">{t('wallet.minSpend')}</th>
+                <th className="text-center px-4 py-3 text-xs text-gray-500 font-medium uppercase tracking-wider">{t('wallet.pointsPerSar')}</th>
+                <th className="text-center px-4 py-3 text-xs text-gray-500 font-medium uppercase tracking-wider">{t('wallet.lounge')}</th>
+                <th className="text-center px-4 py-3 text-xs text-gray-500 font-medium uppercase tracking-wider">{t('wallet.companion')}</th>
               </tr>
             </thead>
             <tbody>
@@ -70,11 +69,11 @@ export default function WalletStrategy() {
           <div className="glass rounded-xl p-5 space-y-4">
             <div className="flex items-center justify-between">
               <div><h3 className="text-lg font-semibold text-white">{card.name}</h3><p className="text-xs text-gray-500">{card.bestFor}</p></div>
-              <div className="flex items-center gap-1 text-accent-amber"><Star className="w-4 h-4 fill-current" /><span className="text-sm font-medium">Recommended</span></div>
+              <div className="flex items-center gap-1 text-accent-amber"><Star className="w-4 h-4 fill-current" /><span className="text-sm font-medium">{t('wallet.recommended')}</span></div>
             </div>
             <div>
               <div className="flex items-center justify-between text-xs text-gray-500 mb-2">
-                <span>Minimum Spend Progress</span>
+                <span>{t('wallet.spendProgress')}</span>
                 <span>{formatPrice(currentSpend)} / {formatPrice(card.minSpend)}</span>
               </div>
               <div className="h-2 bg-surface rounded-full overflow-hidden">
@@ -84,7 +83,7 @@ export default function WalletStrategy() {
                 className="mt-2 w-full bg-surface border border-border-subtle rounded-lg px-3 py-1.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-brand-500/50" />
             </div>
             <div>
-              <h4 className="text-xs text-gray-500 uppercase tracking-wider mb-2">Transfer Partners</h4>
+              <h4 className="text-xs text-gray-500 uppercase tracking-wider mb-2">{t('wallet.transferPartners')}</h4>
               <div className="flex flex-wrap gap-2">
                 {card.transferPartners.map(p => (
                   <span key={p} className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-surface-hover border border-border-subtle text-xs text-gray-300">

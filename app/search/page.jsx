@@ -2,19 +2,21 @@
 
 import { useState, useMemo } from 'react';
 import { Search, Plane, ArrowRightLeft, Users, SlidersHorizontal, Sparkles, MapPin, Calendar, Grid3x3, Loader2 } from 'lucide-react';
-import { airports, homeAirports, destAirports } from '../../data/airports';
 import { useInfiniteFlights } from '../../lib/hooks/useFlightSearch';
 import { calculateValueScore, formatPrice, cn } from '../../lib/utils';
 import FlightTable from '../../components/FlightTable';
+import AirportSearch from '../../components/AirportSearch';
 import { generateAllLinks } from '../../lib/api/deepLinks';
+import { useI18n } from '../../lib/i18n';
 
 const hubSuggestions = [
-  { hub: 'IST', savings: '15-25%', note: 'Turkish Airlines hub — great for Europe/Asia' },
-  { hub: 'DXB', savings: '10-20%', note: 'Emirates hub — strong Asia/Africa connections' },
-  { hub: 'LHR', savings: '5-15%', note: 'BA hub — ideal for Americas via Avios' },
+  { hub: 'IST', savings: '15-25%', noteEn: 'Turkish Airlines hub — great for Europe/Asia', noteAr: 'مركز الخطوط التركية — ممتاز لأوروبا/آسيا' },
+  { hub: 'DXB', savings: '10-20%', noteEn: 'Emirates hub — strong Asia/Africa connections', noteAr: 'مركز طيران الإمارات — اتصالات قوية لآسيا/أفريقيا' },
+  { hub: 'LHR', savings: '5-15%', noteEn: 'BA hub — ideal for Americas via Avios', noteAr: 'مركز الخطوط البريطانية — مثالي للأمريكتين عبر أفيوس' },
 ];
 
 function FlexibleDateGrid({ origin, destination, centerDate }) {
+  const { t } = useI18n();
   if (!origin || !destination || !centerDate) return null;
 
   const dates = [];
@@ -25,7 +27,6 @@ function FlexibleDateGrid({ origin, destination, centerDate }) {
     dates.push(d.toISOString().split('T')[0]);
   }
 
-  // Generate simulated prices for the grid
   const seed = (origin + destination + centerDate).split('').reduce((a, c) => a + c.charCodeAt(0), 0);
   const basePrice = 1200 + (seed % 1500);
   const prices = dates.map((_, i) => {
@@ -38,27 +39,22 @@ function FlexibleDateGrid({ origin, destination, centerDate }) {
     <div className="glass rounded-xl p-5">
       <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
         <Grid3x3 className="w-4 h-4 text-accent-cyan" />
-        Flexible Dates (+/- 3 days)
+        {t('search.flexibleDates')}
       </h3>
       <div className="grid grid-cols-7 gap-2">
         {dates.map((date, i) => {
           const isCenter = i === 3;
           const isCheapest = prices[i] === minPrice;
           return (
-            <div
-              key={date}
-              className={cn(
-                'rounded-lg p-3 text-center border transition-all cursor-pointer hover:border-brand-400/30',
-                isCenter ? 'border-brand-400/50 bg-brand-500/10' : 'border-border-subtle bg-surface-hover',
-                isCheapest && 'border-accent-green/50 bg-accent-green/5'
-              )}
-            >
+            <div key={date} className={cn(
+              'rounded-lg p-3 text-center border transition-all cursor-pointer hover:border-brand-400/30',
+              isCenter ? 'border-brand-400/50 bg-brand-500/10' : 'border-border-subtle bg-surface-hover',
+              isCheapest && 'border-accent-green/50 bg-accent-green/5'
+            )}>
               <div className="text-[10px] text-gray-500">{new Date(date).toLocaleDateString('en-US', { weekday: 'short' })}</div>
               <div className="text-xs text-gray-300 mt-0.5">{new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</div>
-              <div className={cn('text-sm font-bold mt-1', isCheapest ? 'text-accent-green' : 'text-white')}>
-                {formatPrice(prices[i])}
-              </div>
-              {isCheapest && <div className="text-[8px] text-accent-green font-medium mt-0.5">CHEAPEST</div>}
+              <div className={cn('text-sm font-bold mt-1', isCheapest ? 'text-accent-green' : 'text-white')}>{formatPrice(prices[i])}</div>
+              {isCheapest && <div className="text-[8px] text-accent-green font-medium mt-0.5">{t('search.cheapest')}</div>}
             </div>
           );
         })}
@@ -68,9 +64,12 @@ function FlexibleDateGrid({ origin, destination, centerDate }) {
 }
 
 export default function HackerLab() {
-  const [origin, setOrigin] = useState('RUH');
-  const [destination, setDestination] = useState('');
+  const { t, locale } = useI18n();
+  const [originAirport, setOriginAirport] = useState({ iata: 'RUH', name: 'King Khalid Intl (RUH)', entityId: '95673635' });
+  const [destAirport, setDestAirport] = useState(null);
   const [departDate, setDepartDate] = useState('');
+  const [returnDate, setReturnDate] = useState('');
+  const [tripType, setTripType] = useState('oneway');
   const [cabin, setCabin] = useState('economy');
   const [passengers, setPassengers] = useState(1);
   const [sortBy, setSortBy] = useState('value');
@@ -81,10 +80,8 @@ export default function HackerLab() {
   const allFlights = useMemo(() => {
     if (!data?.pages) return [];
     const flights = data.pages.flatMap(p => p.flights).map(f => ({
-      ...f,
-      valueScore: f.valueScore || calculateValueScore(f),
+      ...f, valueScore: f.valueScore || calculateValueScore(f),
     }));
-
     return [...flights].sort((a, b) => {
       if (sortBy === 'value') return (b.valueScore || 0) - (a.valueScore || 0);
       if (sortBy === 'price') return a.price - b.price;
@@ -95,11 +92,24 @@ export default function HackerLab() {
 
   function handleSearch(e) {
     e.preventDefault();
-    if (!destination || !departDate) return;
-    setSearchParams({ origin, destination, departDate, cabin: cabin.toUpperCase(), max: 10 });
+    if (!destAirport || !departDate) return;
+    setSearchParams({
+      origin: originAirport.iata,
+      destination: destAirport.iata,
+      originEntityId: originAirport.entityId,
+      destinationEntityId: destAirport.entityId,
+      departDate,
+      returnDate: tripType === 'roundtrip' ? returnDate : undefined,
+      cabin: cabin.toUpperCase(),
+      max: 10,
+    });
   }
 
-  const deepLinks = searchParams ? generateAllLinks({ ...searchParams, cabin }) : null;
+  const deepLinks = searchParams ? generateAllLinks({
+    origin: searchParams.origin, destination: searchParams.destination,
+    departDate: searchParams.departDate, returnDate: searchParams.returnDate,
+    cabin,
+  }) : null;
 
   return (
     <div className="space-y-6 animate-slide-up">
@@ -108,96 +118,112 @@ export default function HackerLab() {
           <div className="w-10 h-10 rounded-xl bg-accent-purple/20 flex items-center justify-center">
             <Search className="w-5 h-5 text-accent-purple" />
           </div>
-          The Hacker Lab
+          {t('nav.hackerLab')}
         </h2>
-        <p className="text-sm text-gray-500 mt-1 ml-[52px]">Value-first search with flexible dates and positioning intelligence</p>
+        <p className="text-sm text-gray-500 mt-1 ms-[52px]">{t('search.valueFormula')}</p>
       </div>
 
       {/* Search Form */}
       <form onSubmit={handleSearch} className="glass rounded-xl p-6 space-y-4">
-        <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+        {/* Trip type toggle */}
+        <div className="flex items-center gap-2">
+          <span className="text-[11px] text-gray-500 uppercase tracking-wider">{t('search.tripType')}:</span>
+          <button type="button" onClick={() => setTripType('oneway')}
+            className={cn('px-3 py-1.5 rounded-lg text-xs font-medium transition-all', tripType === 'oneway' ? 'bg-brand-500/20 text-brand-400' : 'text-gray-400 hover:text-gray-200')}>
+            {t('search.oneWay')}
+          </button>
+          <button type="button" onClick={() => setTripType('roundtrip')}
+            className={cn('px-3 py-1.5 rounded-lg text-xs font-medium transition-all', tripType === 'roundtrip' ? 'bg-brand-500/20 text-brand-400' : 'text-gray-400 hover:text-gray-200')}>
+            {t('search.roundTrip')}
+          </button>
+        </div>
+
+        <div className={cn('grid gap-4', tripType === 'roundtrip' ? 'grid-cols-2 lg:grid-cols-6' : 'grid-cols-2 lg:grid-cols-5')}>
+          <AirportSearch
+            label={t('search.origin')}
+            value={originAirport}
+            onChange={setOriginAirport}
+            icon={MapPin}
+            placeholder={t('search.typeToSearch')}
+          />
+          <AirportSearch
+            label={t('search.destination')}
+            value={destAirport}
+            onChange={setDestAirport}
+            icon={Plane}
+            placeholder={t('search.typeToSearch')}
+          />
           <div>
-            <label className="text-[11px] text-gray-500 uppercase tracking-wider mb-1 block">Origin</label>
+            <label className="text-[11px] text-gray-500 uppercase tracking-wider mb-1 block">{t('search.departure')}</label>
             <div className="relative">
-              <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-              <select value={origin} onChange={e => setOrigin(e.target.value)}
-                className="w-full bg-surface-hover border border-border-subtle rounded-lg pl-9 pr-3 py-2.5 text-sm text-white appearance-none focus:outline-none focus:border-brand-500/50">
-                {homeAirports.map(a => <option key={a.code} value={a.code}>{a.code} — {a.city}</option>)}
-              </select>
-            </div>
-          </div>
-          <div>
-            <label className="text-[11px] text-gray-500 uppercase tracking-wider mb-1 block">Destination</label>
-            <div className="relative">
-              <Plane className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-              <select value={destination} onChange={e => setDestination(e.target.value)}
-                className="w-full bg-surface-hover border border-border-subtle rounded-lg pl-9 pr-3 py-2.5 text-sm text-white appearance-none focus:outline-none focus:border-brand-500/50">
-                <option value="">Select destination</option>
-                {destAirports.map(a => <option key={a.code} value={a.code}>{a.code} — {a.city}</option>)}
-              </select>
-            </div>
-          </div>
-          <div>
-            <label className="text-[11px] text-gray-500 uppercase tracking-wider mb-1 block">Departure</label>
-            <div className="relative">
-              <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+              <Calendar className="absolute start-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
               <input type="date" value={departDate} onChange={e => setDepartDate(e.target.value)}
-                className="w-full bg-surface-hover border border-border-subtle rounded-lg pl-9 pr-3 py-2.5 text-sm text-white focus:outline-none focus:border-brand-500/50" />
+                className="w-full bg-surface-hover border border-border-subtle rounded-lg ps-9 pe-3 py-2.5 text-sm text-white focus:outline-none focus:border-brand-500/50" />
             </div>
           </div>
+          {tripType === 'roundtrip' && (
+            <div>
+              <label className="text-[11px] text-gray-500 uppercase tracking-wider mb-1 block">{t('search.return')}</label>
+              <div className="relative">
+                <Calendar className="absolute start-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                <input type="date" value={returnDate} onChange={e => setReturnDate(e.target.value)}
+                  className="w-full bg-surface-hover border border-border-subtle rounded-lg ps-9 pe-3 py-2.5 text-sm text-white focus:outline-none focus:border-brand-500/50" />
+              </div>
+            </div>
+          )}
           <div>
-            <label className="text-[11px] text-gray-500 uppercase tracking-wider mb-1 block">Cabin</label>
+            <label className="text-[11px] text-gray-500 uppercase tracking-wider mb-1 block">{t('search.cabin')}</label>
             <div className="relative">
-              <SlidersHorizontal className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+              <SlidersHorizontal className="absolute start-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
               <select value={cabin} onChange={e => setCabin(e.target.value)}
-                className="w-full bg-surface-hover border border-border-subtle rounded-lg pl-9 pr-3 py-2.5 text-sm text-white appearance-none focus:outline-none focus:border-brand-500/50">
-                <option value="economy">Economy</option>
-                <option value="business">Business</option>
-                <option value="first">First</option>
+                className="w-full bg-surface-hover border border-border-subtle rounded-lg ps-9 pe-3 py-2.5 text-sm text-white appearance-none focus:outline-none focus:border-brand-500/50">
+                <option value="economy">{t('search.economy')}</option>
+                <option value="business">{t('search.business')}</option>
+                <option value="first">{t('search.first')}</option>
               </select>
             </div>
           </div>
           <div>
-            <label className="text-[11px] text-gray-500 uppercase tracking-wider mb-1 block">Passengers</label>
+            <label className="text-[11px] text-gray-500 uppercase tracking-wider mb-1 block">{t('search.passengers')}</label>
             <div className="relative">
-              <Users className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+              <Users className="absolute start-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
               <input type="number" min="1" max="9" value={passengers} onChange={e => setPassengers(Number(e.target.value))}
-                className="w-full bg-surface-hover border border-border-subtle rounded-lg pl-9 pr-3 py-2.5 text-sm text-white focus:outline-none focus:border-brand-500/50" />
+                className="w-full bg-surface-hover border border-border-subtle rounded-lg ps-9 pe-3 py-2.5 text-sm text-white focus:outline-none focus:border-brand-500/50" />
             </div>
           </div>
         </div>
+
         <div className="flex items-center justify-between">
           <p className="text-[11px] text-gray-500">
-            <Sparkles className="w-3 h-3 inline mr-1" />
-            Value Score = (Comfort + Loyalty) / (Price x Duration) — higher is better
+            <Sparkles className="w-3 h-3 inline me-1" />
+            {t('search.valueFormula')}
           </p>
-          <button type="submit" className="px-6 py-2.5 bg-brand-500 hover:bg-brand-600 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
-            <Search className="w-4 h-4" />
-            Search Flights
+          <button type="submit" disabled={isLoading}
+            className="px-6 py-2.5 bg-brand-500 hover:bg-brand-600 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2 disabled:opacity-50">
+            {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+            {isLoading ? t('search.searching') : t('search.searchFlights')}
           </button>
         </div>
       </form>
 
       {/* Flexible Dates */}
-      {searchParams && (
-        <FlexibleDateGrid origin={searchParams.origin} destination={searchParams.destination} centerDate={searchParams.departDate} />
-      )}
+      {searchParams && <FlexibleDateGrid origin={searchParams.origin} destination={searchParams.destination} centerDate={searchParams.departDate} />}
 
       {/* Positioning Flights */}
       <div className="glass rounded-xl p-5">
         <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
           <ArrowRightLeft className="w-4 h-4 text-accent-cyan" />
-          Positioning Flight Suggestions
+          {t('search.positioningTitle')}
         </h3>
-        <p className="text-xs text-gray-500 mb-4">Flying to a hub first could save you money on your final destination</p>
+        <p className="text-xs text-gray-500 mb-4">{t('search.positioningDesc')}</p>
         <div className="grid grid-cols-3 gap-3">
           {hubSuggestions.map(hub => (
             <div key={hub.hub} className="bg-surface-hover rounded-lg p-3 border border-border-subtle">
               <div className="flex items-center justify-between mb-1">
-                <span className="text-sm font-semibold text-white">{origin} → {hub.hub} → Dest</span>
+                <span className="text-sm font-semibold text-white">{originAirport?.iata || 'RUH'} → {hub.hub} → Dest</span>
                 <span className="text-xs text-accent-green font-medium">{hub.savings}</span>
               </div>
-              <p className="text-[11px] text-gray-400">{hub.note}</p>
+              <p className="text-[11px] text-gray-400">{locale === 'ar' ? hub.noteAr : hub.noteEn}</p>
             </div>
           ))}
         </div>
@@ -206,7 +232,7 @@ export default function HackerLab() {
       {/* Deep-links */}
       {deepLinks && (
         <div className="glass rounded-xl p-4 flex items-center gap-3 flex-wrap">
-          <span className="text-[11px] text-gray-500 uppercase tracking-wider">Also search on:</span>
+          <span className="text-[11px] text-gray-500 uppercase tracking-wider">{t('search.alsoSearchOn')}</span>
           {Object.entries(deepLinks).map(([name, url]) => (
             <a key={name} href={url} target="_blank" rel="noopener noreferrer"
               className="px-3 py-1.5 rounded-lg bg-surface-hover border border-border-subtle text-xs text-gray-300 hover:text-white hover:border-brand-400/30 transition-all">
@@ -219,35 +245,29 @@ export default function HackerLab() {
       {/* Sort Controls */}
       {allFlights.length > 0 && (
         <div className="flex items-center justify-between">
-          <span className="text-sm text-gray-400">{allFlights.length} results</span>
+          <span className="text-sm text-gray-400">{allFlights.length} {t('search.results')}</span>
           <div className="flex items-center gap-2">
             {[
-              { key: 'value', label: 'Best Value' },
-              { key: 'price', label: 'Cheapest' },
-              { key: 'duration', label: 'Fastest' },
+              { key: 'value', labelKey: 'sort.bestValue' },
+              { key: 'price', labelKey: 'sort.cheapest' },
+              { key: 'duration', labelKey: 'sort.fastest' },
             ].map(s => (
               <button key={s.key} onClick={() => setSortBy(s.key)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                  sortBy === s.key ? 'bg-brand-500/20 text-brand-400' : 'text-gray-500 hover:text-gray-300'
-                }`}>
-                {s.label}
+                className={cn('px-3 py-1.5 rounded-lg text-xs font-medium transition-all',
+                  sortBy === s.key ? 'bg-brand-500/20 text-brand-400' : 'text-gray-500 hover:text-gray-300')}>
+                {t(s.labelKey)}
               </button>
             ))}
           </div>
         </div>
       )}
 
-      {/* Results */}
-      <FlightTable
-        flights={allFlights}
-        loading={isLoading}
-        showLoadMore={hasNextPage}
-        onLoadMore={() => fetchNextPage()}
-      />
+      <FlightTable flights={allFlights} loading={isLoading} showLoadMore={hasNextPage} onLoadMore={() => fetchNextPage()}
+        flags={data?.pages?.[0]?.flags || []} />
 
       {isFetchingNextPage && (
         <div className="flex items-center justify-center gap-2 text-sm text-gray-500 py-4">
-          <Loader2 className="w-4 h-4 animate-spin" /> Loading more flights...
+          <Loader2 className="w-4 h-4 animate-spin" /> {t('search.loadingMore')}
         </div>
       )}
     </div>
