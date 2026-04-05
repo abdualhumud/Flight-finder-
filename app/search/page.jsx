@@ -8,6 +8,7 @@ import FlightTable from '../../components/FlightTable';
 import AirportSearch from '../../components/AirportSearch';
 import { generateAllLinks } from '../../lib/api/deepLinks';
 import { useI18n } from '../../lib/i18n';
+import PriceProbe from '../../components/PriceProbe';
 
 const hubSuggestions = [
   { hub: 'IST', savings: '15-25%', noteEn: 'Turkish Airlines hub — great for Europe/Asia', noteAr: 'مركز الخطوط التركية — ممتاز لأوروبا/آسيا' },
@@ -240,6 +241,17 @@ export default function HackerLab() {
             </a>
           ))}
         </div>
+      )}
+
+      {/* Price Probe — no-API-key mode */}
+      {searchParams && (
+        <PriceProbe searchParams={{
+          origin: searchParams.origin,
+          destination: searchParams.destination,
+          departDate: searchParams.departDate,
+          returnDate: searchParams.returnDate,
+          cabin,
+        }} />
       )}
 
       {/* Sort Controls */}
