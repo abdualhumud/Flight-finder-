@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { Search, Plane, ArrowRightLeft, Users, SlidersHorizontal, Sparkles, MapPin, Calendar, Grid3x3, Loader2 } from 'lucide-react';
-import { useInfiniteFlights } from '../../lib/hooks/useFlightSearch';
+import { Search, Plane, ArrowRightLeft, Users, SlidersHorizontal, Sparkles, MapPin, Calendar, Grid3x3, Loader2, Globe, Wifi } from 'lucide-react';
+import { useInfiniteFlights, useGeoArbitrage } from '../../lib/hooks/useFlightSearch';
 import { calculateValueScore, formatPrice, cn } from '../../lib/utils';
 import FlightTable from '../../components/FlightTable';
 import AirportSearch from '../../components/AirportSearch';
@@ -77,6 +77,7 @@ export default function HackerLab() {
   const [searchParams, setSearchParams] = useState(null);
 
   const { data, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteFlights(searchParams);
+  const { data: geoData, isLoading: geoLoading } = useGeoArbitrage(searchParams);
 
   const allFlights = useMemo(() => {
     if (!data?.pages) return [];
@@ -102,7 +103,7 @@ export default function HackerLab() {
       departDate,
       returnDate: tripType === 'roundtrip' ? returnDate : undefined,
       cabin: cabin.toUpperCase(),
-      max: 10,
+      max: 25,
     });
   }
 
@@ -240,6 +241,45 @@ export default function HackerLab() {
               {name.charAt(0).toUpperCase() + name.slice(1)}
             </a>
           ))}
+        </div>
+      )}
+
+      {/* Geo-Pricing Summary — inline POS comparison */}
+      {searchParams && geoData && !geoLoading && (
+        <div className="glass rounded-xl p-4">
+          <h3 className="text-xs font-semibold text-white mb-3 flex items-center gap-2">
+            <Globe className="w-4 h-4 text-accent-cyan" />
+            {t('geo.title')} — {searchParams.origin} → {searchParams.destination}
+          </h3>
+          <div className="grid grid-cols-4 lg:grid-cols-8 gap-2">
+            {geoData.slice(0, 8).map((m, i) => {
+              const isCheapest = i === 0;
+              return (
+                <div key={m.market} className={cn(
+                  'rounded-lg p-2.5 text-center border transition-all',
+                  isCheapest ? 'border-accent-green/40 bg-accent-green/5' : 'border-border-subtle bg-surface-hover'
+                )}>
+                  <div className="text-[10px] text-gray-500 truncate">{m.market}</div>
+                  <div className={cn('text-sm font-bold mt-0.5', isCheapest ? 'text-accent-green' : 'text-white')}>
+                    {formatPrice(m.cheapestPrice)}
+                  </div>
+                  {m.savings > 0 && (
+                    <div className="text-[9px] text-accent-green font-medium mt-0.5">-{m.savings}%</div>
+                  )}
+                  {m.vpnLocation && (
+                    <div className="text-[8px] text-gray-600 mt-0.5 flex items-center justify-center gap-0.5">
+                      <Wifi className="w-2.5 h-2.5" /> VPN
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+      {searchParams && geoLoading && (
+        <div className="glass rounded-xl p-3 flex items-center gap-2 text-xs text-gray-500">
+          <Loader2 className="w-3 h-3 animate-spin" /> {t('geo.scanning')}
         </div>
       )}
 

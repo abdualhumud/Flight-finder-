@@ -169,7 +169,7 @@ export default function GeoArbitrage() {
                           )}
                         </td>
                         <td className="text-center px-4 py-3">
-                          <a href={links.google} target="_blank" rel="noopener noreferrer"
+                          <a href={links['Google Flights']} target="_blank" rel="noopener noreferrer"
                             className="inline-flex items-center gap-1 px-2 py-1 rounded bg-surface-hover text-[10px] text-gray-400 hover:text-white transition-colors">
                             <ExternalLink className="w-3 h-3" /> Search
                           </a>

@@ -21,6 +21,15 @@ function FlightRow({ flight, rank }) {
   const rating = getValueRating(vs);
   const savings = flight.originalPrice ? Math.round(((flight.originalPrice - flight.price) / flight.originalPrice) * 100) : 0;
   const isLive = flight.source === 'amadeus' || flight.source === 'skyscanner';
+  const sourceLabels = {
+    amadeus: 'Amadeus',
+    skyscanner: 'Skyscanner',
+    google_flights: 'Google',
+    trip_com: 'Trip.com',
+    kayak: 'Kayak',
+    simulated: 'SIM',
+  };
+  const sourceLabel = sourceLabels[flight.source] || flight.source;
 
   const links = flight.deepLink
     ? { provider: flight.deepLink }
@@ -53,8 +62,14 @@ function FlightRow({ flight, rank }) {
               {t(config.labelKey)}
             </span>
             {/* Source indicator */}
-            <span className={cn('text-[8px] font-mono px-1 py-0.5 rounded', isLive ? 'bg-accent-green/10 text-accent-green' : 'bg-gray-700/30 text-gray-500')}>
-              {isLive ? t('flight.live') : t('flight.simulated')}
+            <span className={cn('text-[8px] font-mono px-1.5 py-0.5 rounded',
+              isLive ? 'bg-accent-green/10 text-accent-green' :
+              flight.source === 'google_flights' ? 'bg-blue-500/10 text-blue-400' :
+              flight.source === 'trip_com' ? 'bg-red-500/10 text-red-400' :
+              flight.source === 'kayak' ? 'bg-orange-500/10 text-orange-400' :
+              'bg-gray-700/30 text-gray-500'
+            )}>
+              {sourceLabel}
             </span>
           </div>
 
