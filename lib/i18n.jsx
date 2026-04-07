@@ -59,6 +59,14 @@ const translations = {
     'search.positioningDesc': 'Flying to a hub first could save you money on your final destination',
     'search.alsoSearchOn': 'Also search on:',
     'search.typeToSearch': 'Type to search airports...',
+    'search.flexibility': 'Flexibility',
+    'search.exact': 'Exact',
+    'search.pm3Days': '±3 Days',
+    'search.wholeMonth': 'Month',
+    'search.anytime': 'Anytime',
+    'search.monthView': 'Month Calendar — cheapest days',
+    'search.cheapestInYear': 'Cheapest Month to Fly',
+    'search.clickMarket': 'Click a market for proxy setup',
 
     // Sort
     'sort.bestValue': 'Best Value',
@@ -130,6 +138,16 @@ const translations = {
     'geo.step2Desc': 'Open a new incognito/private window and clear cookies first',
     'geo.step3Title': '3. Search & Book',
     'geo.step3Desc': 'Search on the airline\'s local site for that country to get regional pricing',
+    'geo.proxyTitle': 'Geo-Proxy Navigator',
+    'geo.proxyDesc': 'Generate POS-specific URLs with proxy/VPN configuration for regional pricing',
+    'geo.targetMarket': 'Target Market',
+    'geo.platform': 'Platform',
+    'geo.generatedUrl': 'POS-Specific URL',
+    'geo.proxyWorkflow': 'Copy & Open Incognito Workflow',
+    'geo.proxyStep1': 'Connect VPN/Proxy to target country',
+    'geo.proxyStep2': 'Open incognito window',
+    'geo.proxyStep3': 'Paste URL and search for regional price',
+    'geo.proxyConfig': 'Advanced: Proxy Server Configuration',
 
     // Tracker
     'tracker.title': 'Price Watchdog',
@@ -247,6 +265,14 @@ const translations = {
     'search.positioningDesc': 'السفر إلى مركز أولاً قد يوفر لك المال على وجهتك النهائية',
     'search.alsoSearchOn': 'ابحث أيضًا على:',
     'search.typeToSearch': 'اكتب للبحث عن المطارات...',
+    'search.flexibility': 'المرونة',
+    'search.exact': 'محدد',
+    'search.pm3Days': '±3 أيام',
+    'search.wholeMonth': 'الشهر',
+    'search.anytime': 'أي وقت',
+    'search.monthView': 'تقويم الشهر — أرخص الأيام',
+    'search.cheapestInYear': 'أرخص شهر للسفر',
+    'search.clickMarket': 'انقر على سوق لإعداد البروكسي',
 
     // Sort
     'sort.bestValue': 'أفضل قيمة',
@@ -318,6 +344,16 @@ const translations = {
     'geo.step2Desc': 'افتح نافذة تخفي جديدة وامسح ملفات تعريف الارتباط أولاً',
     'geo.step3Title': '3. ابحث واحجز',
     'geo.step3Desc': 'ابحث على الموقع المحلي لشركة الطيران للحصول على تسعير إقليمي',
+    'geo.proxyTitle': 'ملاح التسعير الجغرافي',
+    'geo.proxyDesc': 'إنشاء روابط خاصة بنقطة البيع مع إعدادات VPN/بروكسي للتسعير الإقليمي',
+    'geo.targetMarket': 'السوق المستهدف',
+    'geo.platform': 'المنصة',
+    'geo.generatedUrl': 'رابط نقطة البيع',
+    'geo.proxyWorkflow': 'سير عمل النسخ والفتح في وضع التخفي',
+    'geo.proxyStep1': 'اتصل بـ VPN/بروكسي للبلد المستهدف',
+    'geo.proxyStep2': 'افتح نافذة تخفي',
+    'geo.proxyStep3': 'الصق الرابط وابحث عن السعر الإقليمي',
+    'geo.proxyConfig': 'متقدم: إعداد خادم البروكسي',
 
     // Tracker
     'tracker.title': 'مراقب الأسعار',

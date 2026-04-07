@@ -8,12 +8,22 @@ import { calculateValueScore } from '../lib/utils';
 import { useI18n } from '../lib/i18n';
 
 const monitoredRoutes = [
-  { origin: 'RUH', destination: 'LHR', departDate: '2026-05-15' },
-  { origin: 'JED', destination: 'IST', departDate: '2026-05-18' },
-  { origin: 'RUH', destination: 'BKK', departDate: '2026-05-22' },
-  { origin: 'RUH', destination: 'CDG', departDate: '2026-05-25' },
-  { origin: 'JED', destination: 'KUL', departDate: '2026-06-01' },
-  { origin: 'RUH', destination: 'DXB', departDate: '2026-05-10' },
+  // Europe
+  { origin: 'RUH', destination: 'AMS', departDate: '2026-05-15', label: 'Amsterdam' },
+  { origin: 'RUH', destination: 'BCN', departDate: '2026-05-18', label: 'Barcelona' },
+  { origin: 'RUH', destination: 'MAD', departDate: '2026-05-20', label: 'Madrid' },
+  { origin: 'JED', destination: 'PRG', departDate: '2026-05-22', label: 'Prague' },
+  { origin: 'RUH', destination: 'WAW', departDate: '2026-05-25', label: 'Warsaw' },
+  { origin: 'RUH', destination: 'LIS', departDate: '2026-05-28', label: 'Lisbon' },
+  { origin: 'RUH', destination: 'LHR', departDate: '2026-06-01', label: 'London' },
+  // Asia
+  { origin: 'RUH', destination: 'BKK', departDate: '2026-06-05', label: 'Bangkok' },
+  { origin: 'JED', destination: 'SGN', departDate: '2026-06-08', label: 'Ho Chi Minh' },
+  // Americas
+  { origin: 'RUH', destination: 'MEX', departDate: '2026-06-12', label: 'Mexico City' },
+  // Africa
+  { origin: 'RUH', destination: 'JNB', departDate: '2026-06-15', label: 'Johannesburg' },
+  { origin: 'RUH', destination: 'CPT', departDate: '2026-06-18', label: 'Cape Town' },
 ];
 
 export default function MissionControl() {

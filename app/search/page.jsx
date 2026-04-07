@@ -9,51 +9,86 @@ import AirportSearch from '../../components/AirportSearch';
 import { generateAllLinks } from '../../lib/api/deepLinks';
 import { useI18n } from '../../lib/i18n';
 import PriceProbe from '../../components/PriceProbe';
+import GeoProxy from '../../components/GeoProxy';
 
 const hubSuggestions = [
   { hub: 'IST', savings: '15-25%', noteEn: 'Turkish Airlines hub — great for Europe/Asia', noteAr: 'مركز الخطوط التركية — ممتاز لأوروبا/آسيا' },
-  { hub: 'DXB', savings: '10-20%', noteEn: 'Emirates hub — strong Asia/Africa connections', noteAr: 'مركز طيران الإمارات — اتصالات قوية لآسيا/أفريقيا' },
+  { hub: 'DOH', savings: '10-20%', noteEn: 'Qatar Airways hub — strong global connections', noteAr: 'مركز الخطوط القطرية — اتصالات عالمية قوية' },
   { hub: 'LHR', savings: '5-15%', noteEn: 'BA hub — ideal for Americas via Avios', noteAr: 'مركز الخطوط البريطانية — مثالي للأمريكتين عبر أفيوس' },
 ];
 
-function FlexibleDateGrid({ origin, destination, centerDate }) {
+function FlexibleDateGrid({ origin, destination, centerDate, flexibility = 'pm3' }) {
   const { t } = useI18n();
   if (!origin || !destination || !centerDate) return null;
-
-  const dates = [];
-  const center = new Date(centerDate);
-  for (let i = -3; i <= 3; i++) {
-    const d = new Date(center);
-    d.setDate(d.getDate() + i);
-    dates.push(d.toISOString().split('T')[0]);
-  }
+  if (flexibility === 'exact') return null; // no grid for exact dates
 
   const seed = (origin + destination + centerDate).split('').reduce((a, c) => a + c.charCodeAt(0), 0);
   const basePrice = 1200 + (seed % 1500);
+
+  // Generate dates based on flexibility mode
+  let dates = [];
+  const center = new Date(centerDate);
+
+  if (flexibility === 'pm3') {
+    for (let i = -3; i <= 3; i++) {
+      const d = new Date(center);
+      d.setDate(d.getDate() + i);
+      dates.push(d.toISOString().split('T')[0]);
+    }
+  } else if (flexibility === 'month') {
+    const year = center.getFullYear();
+    const month = center.getMonth();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    for (let d = 1; d <= daysInMonth; d++) {
+      dates.push(new Date(year, month, d).toISOString().split('T')[0]);
+    }
+  } else if (flexibility === 'anytime') {
+    // Show 12 months from now
+    const today = new Date();
+    for (let m = 0; m < 12; m++) {
+      const d = new Date(today.getFullYear(), today.getMonth() + m, 15);
+      dates.push(d.toISOString().split('T')[0]);
+    }
+  }
+
   const prices = dates.map((_, i) => {
-    const variation = 0.75 + ((seed * (i + 1) * 7) % 100) / 200;
+    const variation = 0.65 + ((seed * (i + 1) * 7) % 100) / 200;
     return Math.round(basePrice * variation);
   });
   const minPrice = Math.min(...prices);
+
+  const isMonth = flexibility === 'month';
+  const isAnytime = flexibility === 'anytime';
 
   return (
     <div className="glass rounded-xl p-5">
       <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
         <Grid3x3 className="w-4 h-4 text-accent-cyan" />
-        {t('search.flexibleDates')}
+        {isAnytime ? t('search.cheapestInYear') : isMonth ? t('search.monthView') : t('search.flexibleDates')}
       </h3>
-      <div className="grid grid-cols-7 gap-2">
+      <div className={cn('grid gap-2',
+        isAnytime ? 'grid-cols-4 lg:grid-cols-6' :
+        isMonth ? 'grid-cols-7' :
+        'grid-cols-7'
+      )}>
         {dates.map((date, i) => {
-          const isCenter = i === 3;
+          const isCenter = !isAnytime && !isMonth && i === 3;
           const isCheapest = prices[i] === minPrice;
+          const d = new Date(date);
           return (
             <div key={date} className={cn(
-              'rounded-lg p-3 text-center border transition-all cursor-pointer hover:border-brand-400/30',
+              'rounded-lg p-2 text-center border transition-all cursor-pointer hover:border-brand-400/30',
               isCenter ? 'border-brand-400/50 bg-brand-500/10' : 'border-border-subtle bg-surface-hover',
               isCheapest && 'border-accent-green/50 bg-accent-green/5'
             )}>
-              <div className="text-[10px] text-gray-500">{new Date(date).toLocaleDateString('en-US', { weekday: 'short' })}</div>
-              <div className="text-xs text-gray-300 mt-0.5">{new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</div>
+              {isAnytime ? (
+                <div className="text-[10px] text-gray-500">{d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' })}</div>
+              ) : (
+                <>
+                  <div className="text-[10px] text-gray-500">{d.toLocaleDateString('en-US', { weekday: 'short' })}</div>
+                  <div className="text-xs text-gray-300 mt-0.5">{d.toLocaleDateString('en-US', isMonth ? { day: 'numeric' } : { month: 'short', day: 'numeric' })}</div>
+                </>
+              )}
               <div className={cn('text-sm font-bold mt-1', isCheapest ? 'text-accent-green' : 'text-white')}>{formatPrice(prices[i])}</div>
               {isCheapest && <div className="text-[8px] text-accent-green font-medium mt-0.5">{t('search.cheapest')}</div>}
             </div>
@@ -74,6 +109,8 @@ export default function HackerLab() {
   const [cabin, setCabin] = useState('economy');
   const [passengers, setPassengers] = useState(1);
   const [sortBy, setSortBy] = useState('value');
+  const [flexibility, setFlexibility] = useState('exact'); // exact | pm3 | month | anytime
+  const [selectedGeoMarket, setSelectedGeoMarket] = useState(null);
   const [searchParams, setSearchParams] = useState(null);
 
   const { data, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteFlights(searchParams);
@@ -127,17 +164,34 @@ export default function HackerLab() {
 
       {/* Search Form */}
       <form onSubmit={handleSearch} className="glass rounded-xl p-6 space-y-4">
-        {/* Trip type toggle */}
-        <div className="flex items-center gap-2">
-          <span className="text-[11px] text-gray-500 uppercase tracking-wider">{t('search.tripType')}:</span>
-          <button type="button" onClick={() => setTripType('oneway')}
-            className={cn('px-3 py-1.5 rounded-lg text-xs font-medium transition-all', tripType === 'oneway' ? 'bg-brand-500/20 text-brand-400' : 'text-gray-400 hover:text-gray-200')}>
-            {t('search.oneWay')}
-          </button>
-          <button type="button" onClick={() => setTripType('roundtrip')}
-            className={cn('px-3 py-1.5 rounded-lg text-xs font-medium transition-all', tripType === 'roundtrip' ? 'bg-brand-500/20 text-brand-400' : 'text-gray-400 hover:text-gray-200')}>
-            {t('search.roundTrip')}
-          </button>
+        {/* Trip type + Flexibility toggle */}
+        <div className="flex items-center gap-4 flex-wrap">
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] text-gray-500 uppercase tracking-wider">{t('search.tripType')}:</span>
+            <button type="button" onClick={() => setTripType('oneway')}
+              className={cn('px-3 py-1.5 rounded-lg text-xs font-medium transition-all', tripType === 'oneway' ? 'bg-brand-500/20 text-brand-400' : 'text-gray-400 hover:text-gray-200')}>
+              {t('search.oneWay')}
+            </button>
+            <button type="button" onClick={() => setTripType('roundtrip')}
+              className={cn('px-3 py-1.5 rounded-lg text-xs font-medium transition-all', tripType === 'roundtrip' ? 'bg-brand-500/20 text-brand-400' : 'text-gray-400 hover:text-gray-200')}>
+              {t('search.roundTrip')}
+            </button>
+          </div>
+          <div className="flex items-center gap-2 border-s border-border-subtle ps-4">
+            <span className="text-[11px] text-gray-500 uppercase tracking-wider">{t('search.flexibility')}:</span>
+            {[
+              { key: 'exact', labelKey: 'search.exact' },
+              { key: 'pm3', labelKey: 'search.pm3Days' },
+              { key: 'month', labelKey: 'search.wholeMonth' },
+              { key: 'anytime', labelKey: 'search.anytime' },
+            ].map(f => (
+              <button key={f.key} type="button" onClick={() => setFlexibility(f.key)}
+                className={cn('px-3 py-1.5 rounded-lg text-xs font-medium transition-all',
+                  flexibility === f.key ? 'bg-accent-cyan/20 text-accent-cyan' : 'text-gray-400 hover:text-gray-200')}>
+                {t(f.labelKey)}
+              </button>
+            ))}
+          </div>
         </div>
 
         <div className={cn('grid gap-4', tripType === 'roundtrip' ? 'grid-cols-2 lg:grid-cols-6' : 'grid-cols-2 lg:grid-cols-5')}>
@@ -209,7 +263,7 @@ export default function HackerLab() {
       </form>
 
       {/* Flexible Dates */}
-      {searchParams && <FlexibleDateGrid origin={searchParams.origin} destination={searchParams.destination} centerDate={searchParams.departDate} />}
+      {searchParams && <FlexibleDateGrid origin={searchParams.origin} destination={searchParams.destination} centerDate={searchParams.departDate} flexibility={flexibility} />}
 
       {/* Positioning Flights */}
       <div className="glass rounded-xl p-5">
@@ -244,21 +298,27 @@ export default function HackerLab() {
         </div>
       )}
 
-      {/* Geo-Pricing Summary — inline POS comparison */}
+      {/* Geo-Pricing Summary — inline POS comparison (clickable → opens GeoProxy) */}
       {searchParams && geoData && !geoLoading && (
         <div className="glass rounded-xl p-4">
           <h3 className="text-xs font-semibold text-white mb-3 flex items-center gap-2">
             <Globe className="w-4 h-4 text-accent-cyan" />
             {t('geo.title')} — {searchParams.origin} → {searchParams.destination}
+            <span className="ms-auto text-[9px] text-gray-600 font-normal">{t('search.clickMarket')}</span>
           </h3>
           <div className="grid grid-cols-4 lg:grid-cols-8 gap-2">
             {geoData.slice(0, 8).map((m, i) => {
               const isCheapest = i === 0;
+              const isSelected = selectedGeoMarket === m.countryCode;
               return (
-                <div key={m.market} className={cn(
-                  'rounded-lg p-2.5 text-center border transition-all',
-                  isCheapest ? 'border-accent-green/40 bg-accent-green/5' : 'border-border-subtle bg-surface-hover'
-                )}>
+                <button key={m.market} type="button"
+                  onClick={() => setSelectedGeoMarket(isSelected ? null : m.countryCode)}
+                  className={cn(
+                    'rounded-lg p-2.5 text-center border transition-all cursor-pointer',
+                    isSelected ? 'border-accent-amber/50 bg-accent-amber/10 ring-1 ring-accent-amber/30' :
+                    isCheapest ? 'border-accent-green/40 bg-accent-green/5 hover:border-accent-green/60' :
+                    'border-border-subtle bg-surface-hover hover:border-gray-600'
+                  )}>
                   <div className="text-[10px] text-gray-500 truncate">{m.market}</div>
                   <div className={cn('text-sm font-bold mt-0.5', isCheapest ? 'text-accent-green' : 'text-white')}>
                     {formatPrice(m.cheapestPrice)}
@@ -271,7 +331,7 @@ export default function HackerLab() {
                       <Wifi className="w-2.5 h-2.5" /> VPN
                     </div>
                   )}
-                </div>
+                </button>
               );
             })}
           </div>
@@ -281,6 +341,19 @@ export default function HackerLab() {
         <div className="glass rounded-xl p-3 flex items-center gap-2 text-xs text-gray-500">
           <Loader2 className="w-3 h-3 animate-spin" /> {t('geo.scanning')}
         </div>
+      )}
+
+      {/* GeoProxy Navigator — shown when user clicks a market */}
+      {searchParams && selectedGeoMarket && (
+        <GeoProxy
+          searchParams={{
+            origin: searchParams.origin,
+            destination: searchParams.destination,
+            departDate: searchParams.departDate,
+            returnDate: searchParams.returnDate,
+          }}
+          marketCode={selectedGeoMarket}
+        />
       )}
 
       {/* Price Probe — no-API-key mode */}

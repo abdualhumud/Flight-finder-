@@ -40,9 +40,10 @@ export const upgradeTemplates = [
 export const sweetSpots = [
   { program: 'Avios', route: 'RUH → LHR', milesRequired: 25000, cashValue: 1850, centsPerMile: 7.4, rating: 'Excellent' },
   { program: 'Miles & Smiles', route: 'JED → IST', milesRequired: 15000, cashValue: 980, centsPerMile: 6.5, rating: 'Great' },
-  { program: 'Skywards', route: 'RUH → BKK', milesRequired: 35000, cashValue: 1650, centsPerMile: 4.7, rating: 'Good' },
-  { program: 'KrisFlyer', route: 'JED → SIN', milesRequired: 40000, cashValue: 2200, centsPerMile: 5.5, rating: 'Great' },
-  { program: 'Alfursan', route: 'RUH → CDG', milesRequired: 30000, cashValue: 2400, centsPerMile: 8.0, rating: 'Excellent' },
+  { program: 'Alfursan', route: 'RUH → BCN', milesRequired: 28000, cashValue: 2100, centsPerMile: 7.5, rating: 'Excellent' },
+  { program: 'Alfursan', route: 'RUH → BKK', milesRequired: 35000, cashValue: 1650, centsPerMile: 4.7, rating: 'Good' },
+  { program: 'Miles & Smiles', route: 'RUH → PRG', milesRequired: 20000, cashValue: 1500, centsPerMile: 7.5, rating: 'Excellent' },
+  { program: 'Avios', route: 'RUH → MAD', milesRequired: 22000, cashValue: 1700, centsPerMile: 7.7, rating: 'Excellent' },
 ];
 
 export const costComparisonData = [

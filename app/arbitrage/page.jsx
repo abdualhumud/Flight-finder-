@@ -6,6 +6,7 @@ import { useGeoArbitrage } from '../../lib/hooks/useFlightSearch';
 import { formatPrice, cn } from '../../lib/utils';
 import { generateAllLinks } from '../../lib/api/deepLinks';
 import AirportSearch from '../../components/AirportSearch';
+import GeoProxy from '../../components/GeoProxy';
 import { useI18n } from '../../lib/i18n';
 import { MapPin } from 'lucide-react';
 
@@ -201,6 +202,19 @@ export default function GeoArbitrage() {
               </div>
             </div>
           </div>
+
+          {/* Geo-Proxy Navigator — appears when cheapest market is found */}
+          {cheapestMarket && searchParams && (
+            <GeoProxy
+              searchParams={{
+                origin: searchParams.origin,
+                destination: searchParams.destination,
+                departDate: searchParams.departDate,
+                returnDate: searchParams.returnDate,
+              }}
+              marketCode={cheapestMarket.countryCode}
+            />
+          )}
         </>
       )}
     </div>
