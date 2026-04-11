@@ -30,13 +30,13 @@ export default function HackerTools() {
   const checkedItems = checklist.reduce((acc, cat) => acc + cat.items.filter(i => i.checked).length, 0);
 
   return (
-    <div className="space-y-6 animate-slide-up">
+    <div className="space-y-4 md:space-y-6 animate-slide-up">
       <div>
-        <h2 className="text-2xl font-bold text-white flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-accent-purple/20 flex items-center justify-center"><Zap className="w-5 h-5 text-accent-purple" /></div>
+        <h2 className="text-xl md:text-2xl font-bold text-white flex items-center gap-3">
+          <div className="w-8 h-8 md:w-10 md:h-10 rounded-xl bg-accent-purple/20 flex items-center justify-center flex-shrink-0"><Zap className="w-4 h-4 md:w-5 md:h-5 text-accent-purple" /></div>
           {t('tools.title')}
         </h2>
-        <p className="text-sm text-gray-500 mt-1 ms-[52px]">{t('tools.subtitle')}</p>
+        <p className="text-xs md:text-sm text-gray-500 mt-1 ms-11 md:ms-[52px]">{t('tools.subtitle')}</p>
       </div>
 
       <div className="glass rounded-xl p-5">

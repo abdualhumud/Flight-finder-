@@ -36,20 +36,20 @@ export default function UpgradeSuite() {
   }
 
   return (
-    <div className="space-y-6 animate-slide-up">
+    <div className="space-y-4 md:space-y-6 animate-slide-up">
       <div>
-        <h2 className="text-2xl font-bold text-white flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-accent-cyan/20 flex items-center justify-center"><MessageSquare className="w-5 h-5 text-accent-cyan" /></div>
+        <h2 className="text-xl md:text-2xl font-bold text-white flex items-center gap-3">
+          <div className="w-8 h-8 md:w-10 md:h-10 rounded-xl bg-accent-cyan/20 flex items-center justify-center flex-shrink-0"><MessageSquare className="w-4 h-4 md:w-5 md:h-5 text-accent-cyan" /></div>
           {t('upgrade.title')}
         </h2>
-        <p className="text-sm text-gray-500 mt-1 ms-[52px]">{t('upgrade.subtitle')}</p>
+        <p className="text-xs md:text-sm text-gray-500 mt-1 ms-11 md:ms-[52px]">{t('upgrade.subtitle')}</p>
       </div>
 
-      <div className="glass rounded-xl p-5">
+      <div className="glass rounded-xl p-4 md:p-5">
         <h3 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
           <Sparkles className="w-4 h-4 text-accent-amber" /> {t('upgrade.flightDetails')}
         </h3>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {[
             { key: 'name', placeholder: 'Your Name' }, { key: 'airline', placeholder: 'Airline' },
             { key: 'flightNumber', placeholder: 'Flight Number' }, { key: 'date', placeholder: 'Travel Date', type: 'date' },

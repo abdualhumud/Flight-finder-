@@ -16,7 +16,7 @@ export default function StatusBar() {
   }, []);
 
   return (
-    <div className="h-8 bg-surface border-b border-border-subtle flex items-center justify-between px-4 text-[11px] text-gray-500 flex-shrink-0">
+    <div className="h-8 bg-surface border-b border-border-subtle hidden md:flex items-center justify-between px-4 text-[11px] text-gray-500 flex-shrink-0">
       <div className="flex items-center gap-4">
         <span className="flex items-center gap-1.5">
           <Activity className="w-3 h-3 text-accent-green" />

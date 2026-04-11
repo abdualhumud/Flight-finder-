@@ -36,4 +36,8 @@
   .glow-red {
     box-shadow: 0 0 20px rgba(239, 68, 68, 0.15);
   }
+  /* iOS safe area for mobile bottom nav */
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
 }

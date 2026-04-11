@@ -49,36 +49,36 @@ export default function PriceWatchdog() {
   }
 
   return (
-    <div className="space-y-6 animate-slide-up">
+    <div className="space-y-4 md:space-y-6 animate-slide-up">
       <div>
-        <h2 className="text-2xl font-bold text-white flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-accent-green/20 flex items-center justify-center"><Eye className="w-5 h-5 text-accent-green" /></div>
+        <h2 className="text-xl md:text-2xl font-bold text-white flex items-center gap-3">
+          <div className="w-8 h-8 md:w-10 md:h-10 rounded-xl bg-accent-green/20 flex items-center justify-center flex-shrink-0"><Eye className="w-4 h-4 md:w-5 md:h-5 text-accent-green" /></div>
           {t('tracker.title')}
         </h2>
-        <p className="text-sm text-gray-500 mt-1 ms-[52px]">{t('tracker.subtitle')}</p>
+        <p className="text-xs md:text-sm text-gray-500 mt-1 ms-11 md:ms-[52px]">{t('tracker.subtitle')}</p>
       </div>
 
-      <div className="glass rounded-xl p-5">
+      <div className="glass rounded-xl p-4 md:p-5">
         <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
           <Bell className="w-4 h-4 text-accent-amber" /> {t('tracker.alertCenter')}
           <span className="px-1.5 py-0.5 rounded-full bg-accent-red/20 text-accent-red text-[10px] font-bold">{notifications.filter(n => n.urgent).length}</span>
         </h3>
         <div className="space-y-2">
           {notifications.map(n => (
-            <div key={n.id} className={`flex items-center justify-between p-3 rounded-lg ${n.urgent ? 'bg-accent-red/5 border border-accent-red/20' : 'bg-surface-hover border border-border-subtle'}`}>
-              <div className="flex items-center gap-3">
-                <span className={`w-2 h-2 rounded-full ${n.type === 'error_fare' ? 'bg-accent-red animate-pulse' : n.type === 'price_drop' ? 'bg-accent-green' : 'bg-gray-500'}`} />
-                <span className="text-sm text-gray-300">{n.message}</span>
+            <div key={n.id} className={`flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 sm:gap-3 p-3 rounded-lg ${n.urgent ? 'bg-accent-red/5 border border-accent-red/20' : 'bg-surface-hover border border-border-subtle'}`}>
+              <div className="flex items-center gap-3 min-w-0">
+                <span className={`w-2 h-2 rounded-full flex-shrink-0 ${n.type === 'error_fare' ? 'bg-accent-red animate-pulse' : n.type === 'price_drop' ? 'bg-accent-green' : 'bg-gray-500'}`} />
+                <span className="text-xs sm:text-sm text-gray-300">{n.message}</span>
               </div>
-              <span className="text-[10px] text-gray-500 flex-shrink-0 ms-3">{n.time}</span>
+              <span className="text-[10px] text-gray-500 flex-shrink-0 ms-5 sm:ms-3">{n.time}</span>
             </div>
           ))}
         </div>
       </div>
 
-      <div className="glass rounded-xl p-5">
+      <div className="glass rounded-xl p-4 md:p-5">
         <h3 className="text-sm font-semibold text-white mb-4">{t('tracker.priceHistory')}</h3>
-        <div className="h-64">
+        <div className="h-48 sm:h-64">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={priceHistory}>
               <CartesianGrid strokeDasharray="3 3" stroke="#2a2b3a" />
@@ -94,16 +94,16 @@ export default function PriceWatchdog() {
         </div>
       </div>
 
-      <div className="glass rounded-xl p-5">
+      <div className="glass rounded-xl p-4 md:p-5">
         <h3 className="text-sm font-semibold text-white mb-4 flex items-center gap-2"><Target className="w-4 h-4 text-brand-400" /> {t('tracker.trackedRoutes')}</h3>
         <div className="space-y-2 mb-4">
           {tracked.map(tr => (
-            <div key={tr.id} className="flex items-center justify-between p-3 bg-surface-hover rounded-lg border border-border-subtle">
-              <div className="flex items-center gap-4">
+            <div key={tr.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3 p-3 bg-surface-hover rounded-lg border border-border-subtle">
+              <div className="flex items-center gap-3 sm:gap-4">
                 <span className="text-sm font-semibold text-white">{tr.route}</span>
                 <span className="text-[11px] text-gray-500">{t('tracker.target')} {formatPrice(tr.targetPrice)}</span>
               </div>
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-3 sm:gap-4">
                 <span className="text-sm font-medium text-white">{formatPrice(tr.currentPrice)}</span>
                 <span className={`flex items-center gap-1 text-xs font-medium ${tr.change < 0 ? 'text-accent-green' : tr.change > 0 ? 'text-accent-red' : 'text-gray-500'}`}>
                   {tr.change < 0 ? <TrendingDown className="w-3 h-3" /> : <TrendingUp className="w-3 h-3" />} {Math.abs(tr.change)}%
@@ -113,12 +113,12 @@ export default function PriceWatchdog() {
             </div>
           ))}
         </div>
-        <div className="flex gap-3">
+        <div className="flex flex-col sm:flex-row gap-3">
           <input value={newRoute} onChange={e => setNewRoute(e.target.value)} placeholder={t('tracker.route')}
-            className="flex-1 bg-surface border border-border-subtle rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-brand-500/50" />
+            className="flex-1 bg-surface border border-border-subtle rounded-lg px-3 py-3 md:py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-brand-500/50" />
           <input value={newTarget} onChange={e => setNewTarget(e.target.value)} placeholder={t('tracker.targetPrice')} type="number"
-            className="w-32 bg-surface border border-border-subtle rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-brand-500/50" />
-          <button onClick={addRoute} className="px-4 py-2 bg-brand-500 hover:bg-brand-600 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-1">
+            className="w-full sm:w-32 bg-surface border border-border-subtle rounded-lg px-3 py-3 md:py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-brand-500/50" />
+          <button onClick={addRoute} className="w-full sm:w-auto px-4 py-3 md:py-2 bg-brand-500 hover:bg-brand-600 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-1">
             <Plus className="w-4 h-4" /> {t('tracker.track')}
           </button>
         </div>

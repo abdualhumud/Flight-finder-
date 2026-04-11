@@ -8,7 +8,6 @@ import { calculateValueScore } from '../lib/utils';
 import { useI18n } from '../lib/i18n';
 
 const monitoredRoutes = [
-  // Europe
   { origin: 'RUH', destination: 'AMS', departDate: '2026-05-15', label: 'Amsterdam' },
   { origin: 'RUH', destination: 'BCN', departDate: '2026-05-18', label: 'Barcelona' },
   { origin: 'RUH', destination: 'MAD', departDate: '2026-05-20', label: 'Madrid' },
@@ -16,12 +15,9 @@ const monitoredRoutes = [
   { origin: 'RUH', destination: 'WAW', departDate: '2026-05-25', label: 'Warsaw' },
   { origin: 'RUH', destination: 'LIS', departDate: '2026-05-28', label: 'Lisbon' },
   { origin: 'RUH', destination: 'LHR', departDate: '2026-06-01', label: 'London' },
-  // Asia
   { origin: 'RUH', destination: 'BKK', departDate: '2026-06-05', label: 'Bangkok' },
   { origin: 'JED', destination: 'SGN', departDate: '2026-06-08', label: 'Ho Chi Minh' },
-  // Americas
   { origin: 'RUH', destination: 'MEX', departDate: '2026-06-12', label: 'Mexico City' },
-  // Africa
   { origin: 'RUH', destination: 'JNB', departDate: '2026-06-15', label: 'Johannesburg' },
   { origin: 'RUH', destination: 'CPT', departDate: '2026-06-18', label: 'Cape Town' },
 ];
@@ -56,20 +52,20 @@ export default function MissionControl() {
     : 0;
 
   return (
-    <div className="space-y-6 animate-slide-up">
-      <div className="flex items-center justify-between">
+    <div className="space-y-4 md:space-y-6 animate-slide-up">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h2 className="text-2xl font-bold text-white flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-brand-500/20 flex items-center justify-center">
-              <Radar className="w-5 h-5 text-brand-400" />
+          <h2 className="text-xl md:text-2xl font-bold text-white flex items-center gap-3">
+            <div className="w-8 h-8 md:w-10 md:h-10 rounded-xl bg-brand-500/20 flex items-center justify-center flex-shrink-0">
+              <Radar className="w-4 h-4 md:w-5 md:h-5 text-brand-400" />
             </div>
             {t('mc.title')}
           </h2>
-          <p className="text-sm text-gray-500 mt-1 ms-[52px]">{t('mc.subtitle')} — {monitoredRoutes.length} {t('mc.routesMonitored')}</p>
+          <p className="text-xs md:text-sm text-gray-500 mt-1 ms-11 md:ms-[52px]">{t('mc.subtitle')} — {monitoredRoutes.length} {t('mc.routesMonitored')}</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 ms-11 sm:ms-0">
           <button onClick={() => refetch()} disabled={isFetching}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-hover border border-border-subtle text-xs text-gray-400 hover:text-white transition-all disabled:opacity-50">
+            className="flex items-center gap-1.5 px-3 py-2 sm:py-1.5 rounded-lg bg-surface-hover border border-border-subtle text-xs text-gray-400 hover:text-white transition-all disabled:opacity-50">
             {isFetching ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
             {t('mc.refresh')}
           </button>
@@ -81,26 +77,26 @@ export default function MissionControl() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
         {[
           { icon: Radar, label: t('mc.activeDeals'), value: enrichedDeals.length, color: 'text-white' },
           { icon: AlertTriangle, label: t('mc.errorFares'), value: errorFares, color: 'text-accent-red', iconColor: 'text-accent-red' },
           { icon: TrendingDown, label: t('mc.priceDrops'), value: priceDrops, color: 'text-accent-green', iconColor: 'text-accent-green' },
           { icon: Zap, label: t('mc.avgSavings'), value: `${avgSavings}%`, color: 'text-accent-amber', iconColor: 'text-accent-amber' },
         ].map(stat => (
-          <div key={stat.label} className="glass rounded-xl p-4">
-            <div className="flex items-center gap-2 text-xs text-gray-500 mb-1">
+          <div key={stat.label} className="glass rounded-xl p-3 md:p-4">
+            <div className="flex items-center gap-2 text-[10px] md:text-xs text-gray-500 mb-1">
               <stat.icon className={`w-3.5 h-3.5 ${stat.iconColor || ''}`} /> {stat.label}
             </div>
-            <div className={`text-2xl font-bold ${stat.color}`}>{isLoading ? '...' : stat.value}</div>
+            <div className={`text-xl md:text-2xl font-bold ${stat.color}`}>{isLoading ? '...' : stat.value}</div>
           </div>
         ))}
       </div>
 
       {/* Filters + Sort */}
-      <div className="flex items-center justify-between flex-wrap gap-2">
-        <div className="flex items-center gap-2">
-          <Filter className="w-4 h-4 text-gray-500" />
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div className="flex items-center gap-2 overflow-x-auto">
+          <Filter className="w-4 h-4 text-gray-500 flex-shrink-0" />
           {[
             { key: 'all', labelKey: 'filter.all' },
             { key: 'error_fare', labelKey: 'filter.errorFare' },
@@ -108,13 +104,13 @@ export default function MissionControl() {
             { key: 'deal', labelKey: 'filter.deal' },
           ].map(f => (
             <button key={f.key} onClick={() => setFilter(f.key)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${filter === f.key ? 'bg-brand-500/20 text-brand-400' : 'text-gray-400 hover:text-gray-200 hover:bg-surface-hover'}`}>
+              className={`px-3 py-2 sm:py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap ${filter === f.key ? 'bg-brand-500/20 text-brand-400' : 'text-gray-400 hover:text-gray-200 hover:bg-surface-hover'}`}>
               {t(f.labelKey)}
             </button>
           ))}
         </div>
-        <div className="flex items-center gap-2">
-          <ArrowUpDown className="w-4 h-4 text-gray-500" />
+        <div className="flex items-center gap-2 overflow-x-auto">
+          <ArrowUpDown className="w-4 h-4 text-gray-500 flex-shrink-0" />
           {[
             { key: 'value', labelKey: 'sort.valueScore' },
             { key: 'price', labelKey: 'sort.cheapest' },
@@ -122,7 +118,7 @@ export default function MissionControl() {
             { key: 'savings', labelKey: 'sort.biggestSavings' },
           ].map(s => (
             <button key={s.key} onClick={() => setSortBy(s.key)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${sortBy === s.key ? 'bg-surface-elevated text-white' : 'text-gray-500 hover:text-gray-300'}`}>
+              className={`px-3 py-2 sm:py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap ${sortBy === s.key ? 'bg-surface-elevated text-white' : 'text-gray-500 hover:text-gray-300'}`}>
               {t(s.labelKey)}
             </button>
           ))}

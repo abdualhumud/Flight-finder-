@@ -20,12 +20,11 @@ const hubSuggestions = [
 function FlexibleDateGrid({ origin, destination, centerDate, flexibility = 'pm3' }) {
   const { t } = useI18n();
   if (!origin || !destination || !centerDate) return null;
-  if (flexibility === 'exact') return null; // no grid for exact dates
+  if (flexibility === 'exact') return null;
 
   const seed = (origin + destination + centerDate).split('').reduce((a, c) => a + c.charCodeAt(0), 0);
   const basePrice = 1200 + (seed % 1500);
 
-  // Generate dates based on flexibility mode
   let dates = [];
   const center = new Date(centerDate);
 
@@ -43,7 +42,6 @@ function FlexibleDateGrid({ origin, destination, centerDate, flexibility = 'pm3'
       dates.push(new Date(year, month, d).toISOString().split('T')[0]);
     }
   } else if (flexibility === 'anytime') {
-    // Show 12 months from now
     const today = new Date();
     for (let m = 0; m < 12; m++) {
       const d = new Date(today.getFullYear(), today.getMonth() + m, 15);
@@ -61,15 +59,15 @@ function FlexibleDateGrid({ origin, destination, centerDate, flexibility = 'pm3'
   const isAnytime = flexibility === 'anytime';
 
   return (
-    <div className="glass rounded-xl p-5">
+    <div className="glass rounded-xl p-4 md:p-5">
       <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
         <Grid3x3 className="w-4 h-4 text-accent-cyan" />
         {isAnytime ? t('search.cheapestInYear') : isMonth ? t('search.monthView') : t('search.flexibleDates')}
       </h3>
-      <div className={cn('grid gap-2',
-        isAnytime ? 'grid-cols-4 lg:grid-cols-6' :
-        isMonth ? 'grid-cols-7' :
-        'grid-cols-7'
+      <div className={cn('grid gap-1.5 sm:gap-2',
+        isAnytime ? 'grid-cols-3 sm:grid-cols-4 lg:grid-cols-6' :
+        isMonth ? 'grid-cols-5 sm:grid-cols-7' :
+        'grid-cols-4 sm:grid-cols-7'
       )}>
         {dates.map((date, i) => {
           const isCenter = !isAnytime && !isMonth && i === 3;
@@ -77,19 +75,19 @@ function FlexibleDateGrid({ origin, destination, centerDate, flexibility = 'pm3'
           const d = new Date(date);
           return (
             <div key={date} className={cn(
-              'rounded-lg p-2 text-center border transition-all cursor-pointer hover:border-brand-400/30',
+              'rounded-lg p-1.5 sm:p-2 text-center border transition-all cursor-pointer hover:border-brand-400/30',
               isCenter ? 'border-brand-400/50 bg-brand-500/10' : 'border-border-subtle bg-surface-hover',
               isCheapest && 'border-accent-green/50 bg-accent-green/5'
             )}>
               {isAnytime ? (
-                <div className="text-[10px] text-gray-500">{d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' })}</div>
+                <div className="text-[9px] sm:text-[10px] text-gray-500">{d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' })}</div>
               ) : (
                 <>
-                  <div className="text-[10px] text-gray-500">{d.toLocaleDateString('en-US', { weekday: 'short' })}</div>
-                  <div className="text-xs text-gray-300 mt-0.5">{d.toLocaleDateString('en-US', isMonth ? { day: 'numeric' } : { month: 'short', day: 'numeric' })}</div>
+                  <div className="text-[9px] sm:text-[10px] text-gray-500">{d.toLocaleDateString('en-US', { weekday: 'short' })}</div>
+                  <div className="text-[10px] sm:text-xs text-gray-300 mt-0.5">{d.toLocaleDateString('en-US', isMonth ? { day: 'numeric' } : { month: 'short', day: 'numeric' })}</div>
                 </>
               )}
-              <div className={cn('text-sm font-bold mt-1', isCheapest ? 'text-accent-green' : 'text-white')}>{formatPrice(prices[i])}</div>
+              <div className={cn('text-xs sm:text-sm font-bold mt-1', isCheapest ? 'text-accent-green' : 'text-white')}>{formatPrice(prices[i])}</div>
               {isCheapest && <div className="text-[8px] text-accent-green font-medium mt-0.5">{t('search.cheapest')}</div>}
             </div>
           );
@@ -109,7 +107,7 @@ export default function HackerLab() {
   const [cabin, setCabin] = useState('economy');
   const [passengers, setPassengers] = useState(1);
   const [sortBy, setSortBy] = useState('value');
-  const [flexibility, setFlexibility] = useState('exact'); // exact | pm3 | month | anytime
+  const [flexibility, setFlexibility] = useState('exact');
   const [selectedGeoMarket, setSelectedGeoMarket] = useState(null);
   const [searchParams, setSearchParams] = useState(null);
 
@@ -151,34 +149,34 @@ export default function HackerLab() {
   }) : null;
 
   return (
-    <div className="space-y-6 animate-slide-up">
+    <div className="space-y-4 md:space-y-6 animate-slide-up">
       <div>
-        <h2 className="text-2xl font-bold text-white flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-accent-purple/20 flex items-center justify-center">
-            <Search className="w-5 h-5 text-accent-purple" />
+        <h2 className="text-xl md:text-2xl font-bold text-white flex items-center gap-3">
+          <div className="w-8 h-8 md:w-10 md:h-10 rounded-xl bg-accent-purple/20 flex items-center justify-center flex-shrink-0">
+            <Search className="w-4 h-4 md:w-5 md:h-5 text-accent-purple" />
           </div>
           {t('nav.hackerLab')}
         </h2>
-        <p className="text-sm text-gray-500 mt-1 ms-[52px]">{t('search.valueFormula')}</p>
+        <p className="text-xs md:text-sm text-gray-500 mt-1 ms-11 md:ms-[52px]">{t('search.valueFormula')}</p>
       </div>
 
       {/* Search Form */}
-      <form onSubmit={handleSearch} className="glass rounded-xl p-6 space-y-4">
+      <form onSubmit={handleSearch} className="glass rounded-xl p-4 md:p-6 space-y-4">
         {/* Trip type + Flexibility toggle */}
-        <div className="flex items-center gap-4 flex-wrap">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
           <div className="flex items-center gap-2">
             <span className="text-[11px] text-gray-500 uppercase tracking-wider">{t('search.tripType')}:</span>
             <button type="button" onClick={() => setTripType('oneway')}
-              className={cn('px-3 py-1.5 rounded-lg text-xs font-medium transition-all', tripType === 'oneway' ? 'bg-brand-500/20 text-brand-400' : 'text-gray-400 hover:text-gray-200')}>
+              className={cn('px-3 py-2 sm:py-1.5 rounded-lg text-xs font-medium transition-all', tripType === 'oneway' ? 'bg-brand-500/20 text-brand-400' : 'text-gray-400 hover:text-gray-200')}>
               {t('search.oneWay')}
             </button>
             <button type="button" onClick={() => setTripType('roundtrip')}
-              className={cn('px-3 py-1.5 rounded-lg text-xs font-medium transition-all', tripType === 'roundtrip' ? 'bg-brand-500/20 text-brand-400' : 'text-gray-400 hover:text-gray-200')}>
+              className={cn('px-3 py-2 sm:py-1.5 rounded-lg text-xs font-medium transition-all', tripType === 'roundtrip' ? 'bg-brand-500/20 text-brand-400' : 'text-gray-400 hover:text-gray-200')}>
               {t('search.roundTrip')}
             </button>
           </div>
-          <div className="flex items-center gap-2 border-s border-border-subtle ps-4">
-            <span className="text-[11px] text-gray-500 uppercase tracking-wider">{t('search.flexibility')}:</span>
+          <div className="flex items-center gap-2 sm:border-s sm:border-border-subtle sm:ps-4 overflow-x-auto">
+            <span className="text-[11px] text-gray-500 uppercase tracking-wider flex-shrink-0">{t('search.flexibility')}:</span>
             {[
               { key: 'exact', labelKey: 'search.exact' },
               { key: 'pm3', labelKey: 'search.pm3Days' },
@@ -186,7 +184,7 @@ export default function HackerLab() {
               { key: 'anytime', labelKey: 'search.anytime' },
             ].map(f => (
               <button key={f.key} type="button" onClick={() => setFlexibility(f.key)}
-                className={cn('px-3 py-1.5 rounded-lg text-xs font-medium transition-all',
+                className={cn('px-3 py-2 sm:py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap flex-shrink-0',
                   flexibility === f.key ? 'bg-accent-cyan/20 text-accent-cyan' : 'text-gray-400 hover:text-gray-200')}>
                 {t(f.labelKey)}
               </button>
@@ -194,7 +192,11 @@ export default function HackerLab() {
           </div>
         </div>
 
-        <div className={cn('grid gap-4', tripType === 'roundtrip' ? 'grid-cols-2 lg:grid-cols-6' : 'grid-cols-2 lg:grid-cols-5')}>
+        <div className={cn('grid gap-3 md:gap-4',
+          tripType === 'roundtrip'
+            ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-6'
+            : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-5'
+        )}>
           <AirportSearch
             label={t('search.origin')}
             value={originAirport}
@@ -214,7 +216,7 @@ export default function HackerLab() {
             <div className="relative">
               <Calendar className="absolute start-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
               <input type="date" value={departDate} onChange={e => setDepartDate(e.target.value)}
-                className="w-full bg-surface-hover border border-border-subtle rounded-lg ps-9 pe-3 py-2.5 text-sm text-white focus:outline-none focus:border-brand-500/50" />
+                className="w-full bg-surface-hover border border-border-subtle rounded-lg ps-9 pe-3 py-3 md:py-2.5 text-sm text-white focus:outline-none focus:border-brand-500/50" />
             </div>
           </div>
           {tripType === 'roundtrip' && (
@@ -223,7 +225,7 @@ export default function HackerLab() {
               <div className="relative">
                 <Calendar className="absolute start-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
                 <input type="date" value={returnDate} onChange={e => setReturnDate(e.target.value)}
-                  className="w-full bg-surface-hover border border-border-subtle rounded-lg ps-9 pe-3 py-2.5 text-sm text-white focus:outline-none focus:border-brand-500/50" />
+                  className="w-full bg-surface-hover border border-border-subtle rounded-lg ps-9 pe-3 py-3 md:py-2.5 text-sm text-white focus:outline-none focus:border-brand-500/50" />
               </div>
             </div>
           )}
@@ -232,7 +234,7 @@ export default function HackerLab() {
             <div className="relative">
               <SlidersHorizontal className="absolute start-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
               <select value={cabin} onChange={e => setCabin(e.target.value)}
-                className="w-full bg-surface-hover border border-border-subtle rounded-lg ps-9 pe-3 py-2.5 text-sm text-white appearance-none focus:outline-none focus:border-brand-500/50">
+                className="w-full bg-surface-hover border border-border-subtle rounded-lg ps-9 pe-3 py-3 md:py-2.5 text-sm text-white appearance-none focus:outline-none focus:border-brand-500/50">
                 <option value="economy">{t('search.economy')}</option>
                 <option value="business">{t('search.business')}</option>
                 <option value="first">{t('search.first')}</option>
@@ -244,18 +246,18 @@ export default function HackerLab() {
             <div className="relative">
               <Users className="absolute start-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
               <input type="number" min="1" max="9" value={passengers} onChange={e => setPassengers(Number(e.target.value))}
-                className="w-full bg-surface-hover border border-border-subtle rounded-lg ps-9 pe-3 py-2.5 text-sm text-white focus:outline-none focus:border-brand-500/50" />
+                className="w-full bg-surface-hover border border-border-subtle rounded-lg ps-9 pe-3 py-3 md:py-2.5 text-sm text-white focus:outline-none focus:border-brand-500/50" />
             </div>
           </div>
         </div>
 
-        <div className="flex items-center justify-between">
-          <p className="text-[11px] text-gray-500">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <p className="text-[11px] text-gray-500 hidden sm:block">
             <Sparkles className="w-3 h-3 inline me-1" />
             {t('search.valueFormula')}
           </p>
           <button type="submit" disabled={isLoading}
-            className="px-6 py-2.5 bg-brand-500 hover:bg-brand-600 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2 disabled:opacity-50">
+            className="w-full sm:w-auto px-6 py-3 md:py-2.5 bg-brand-500 hover:bg-brand-600 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50">
             {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
             {isLoading ? t('search.searching') : t('search.searchFlights')}
           </button>
@@ -266,13 +268,13 @@ export default function HackerLab() {
       {searchParams && <FlexibleDateGrid origin={searchParams.origin} destination={searchParams.destination} centerDate={searchParams.departDate} flexibility={flexibility} />}
 
       {/* Positioning Flights */}
-      <div className="glass rounded-xl p-5">
+      <div className="glass rounded-xl p-4 md:p-5">
         <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
           <ArrowRightLeft className="w-4 h-4 text-accent-cyan" />
           {t('search.positioningTitle')}
         </h3>
         <p className="text-xs text-gray-500 mb-4">{t('search.positioningDesc')}</p>
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           {hubSuggestions.map(hub => (
             <div key={hub.hub} className="bg-surface-hover rounded-lg p-3 border border-border-subtle">
               <div className="flex items-center justify-between mb-1">
@@ -287,26 +289,26 @@ export default function HackerLab() {
 
       {/* Deep-links */}
       {deepLinks && (
-        <div className="glass rounded-xl p-4 flex items-center gap-3 flex-wrap">
+        <div className="glass rounded-xl p-3 md:p-4 flex items-center gap-2 md:gap-3 flex-wrap">
           <span className="text-[11px] text-gray-500 uppercase tracking-wider">{t('search.alsoSearchOn')}</span>
           {Object.entries(deepLinks).map(([name, url]) => (
             <a key={name} href={url} target="_blank" rel="noopener noreferrer"
-              className="px-3 py-1.5 rounded-lg bg-surface-hover border border-border-subtle text-xs text-gray-300 hover:text-white hover:border-brand-400/30 transition-all">
+              className="px-3 py-2 md:py-1.5 rounded-lg bg-surface-hover border border-border-subtle text-xs text-gray-300 hover:text-white hover:border-brand-400/30 transition-all">
               {name.charAt(0).toUpperCase() + name.slice(1)}
             </a>
           ))}
         </div>
       )}
 
-      {/* Geo-Pricing Summary — inline POS comparison (clickable → opens GeoProxy) */}
+      {/* Geo-Pricing Summary */}
       {searchParams && geoData && !geoLoading && (
-        <div className="glass rounded-xl p-4">
+        <div className="glass rounded-xl p-3 md:p-4">
           <h3 className="text-xs font-semibold text-white mb-3 flex items-center gap-2">
             <Globe className="w-4 h-4 text-accent-cyan" />
             {t('geo.title')} — {searchParams.origin} → {searchParams.destination}
-            <span className="ms-auto text-[9px] text-gray-600 font-normal">{t('search.clickMarket')}</span>
+            <span className="ms-auto text-[9px] text-gray-600 font-normal hidden sm:inline">{t('search.clickMarket')}</span>
           </h3>
-          <div className="grid grid-cols-4 lg:grid-cols-8 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
             {geoData.slice(0, 8).map((m, i) => {
               const isCheapest = i === 0;
               const isSelected = selectedGeoMarket === m.countryCode;
@@ -343,7 +345,7 @@ export default function HackerLab() {
         </div>
       )}
 
-      {/* GeoProxy Navigator — shown when user clicks a market */}
+      {/* GeoProxy Navigator */}
       {searchParams && selectedGeoMarket && (
         <GeoProxy
           searchParams={{
@@ -356,7 +358,7 @@ export default function HackerLab() {
         />
       )}
 
-      {/* Price Probe — no-API-key mode */}
+      {/* Price Probe */}
       {searchParams && (
         <PriceProbe searchParams={{
           origin: searchParams.origin,
@@ -369,16 +371,16 @@ export default function HackerLab() {
 
       {/* Sort Controls */}
       {allFlights.length > 0 && (
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
           <span className="text-sm text-gray-400">{allFlights.length} {t('search.results')}</span>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 overflow-x-auto">
             {[
               { key: 'value', labelKey: 'sort.bestValue' },
               { key: 'price', labelKey: 'sort.cheapest' },
               { key: 'duration', labelKey: 'sort.fastest' },
             ].map(s => (
               <button key={s.key} onClick={() => setSortBy(s.key)}
-                className={cn('px-3 py-1.5 rounded-lg text-xs font-medium transition-all',
+                className={cn('px-3 py-2 sm:py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap',
                   sortBy === s.key ? 'bg-brand-500/20 text-brand-400' : 'text-gray-500 hover:text-gray-300')}>
                 {t(s.labelKey)}
               </button>

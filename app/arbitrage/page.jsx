@@ -50,18 +50,18 @@ export default function GeoArbitrage() {
   const cheapestMarket = results?.[0];
 
   return (
-    <div className="space-y-6 animate-slide-up">
+    <div className="space-y-4 md:space-y-6 animate-slide-up">
       <div>
-        <h2 className="text-2xl font-bold text-white flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-accent-cyan/20 flex items-center justify-center">
-            <Globe className="w-5 h-5 text-accent-cyan" />
+        <h2 className="text-xl md:text-2xl font-bold text-white flex items-center gap-3">
+          <div className="w-8 h-8 md:w-10 md:h-10 rounded-xl bg-accent-cyan/20 flex items-center justify-center flex-shrink-0">
+            <Globe className="w-4 h-4 md:w-5 md:h-5 text-accent-cyan" />
           </div>
           {t('geo.title')}
         </h2>
-        <p className="text-sm text-gray-500 mt-1 ms-[52px]">{t('geo.subtitle')}</p>
+        <p className="text-xs md:text-sm text-gray-500 mt-1 ms-11 md:ms-[52px]">{t('geo.subtitle')}</p>
       </div>
 
-      <div className="glass rounded-xl p-4 flex items-start gap-3 border border-accent-cyan/20">
+      <div className="glass rounded-xl p-3 md:p-4 flex items-start gap-3 border border-accent-cyan/20">
         <Shield className="w-5 h-5 text-accent-cyan flex-shrink-0 mt-0.5" />
         <div>
           <p className="text-sm text-white font-medium">{t('geo.howTitle')}</p>
@@ -69,8 +69,8 @@ export default function GeoArbitrage() {
         </div>
       </div>
 
-      <form onSubmit={handleSearch} className="glass rounded-xl p-6">
-        <div className="grid grid-cols-3 gap-4">
+      <form onSubmit={handleSearch} className="glass rounded-xl p-4 md:p-6">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4">
           <AirportSearch label={t('search.origin')} value={originAirport} onChange={setOriginAirport} icon={MapPin} placeholder={t('search.typeToSearch')} />
           <AirportSearch label={t('search.destination')} value={destAirport} onChange={setDestAirport} icon={Plane} placeholder={t('search.typeToSearch')} />
           <div>
@@ -78,13 +78,13 @@ export default function GeoArbitrage() {
             <div className="relative">
               <Calendar className="absolute start-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
               <input type="date" value={departDate} onChange={e => setDepartDate(e.target.value)}
-                className="w-full bg-surface-hover border border-border-subtle rounded-lg ps-9 pe-3 py-2.5 text-sm text-white focus:outline-none focus:border-brand-500/50" />
+                className="w-full bg-surface-hover border border-border-subtle rounded-lg ps-9 pe-3 py-3 md:py-2.5 text-sm text-white focus:outline-none focus:border-brand-500/50" />
             </div>
           </div>
         </div>
         <div className="flex justify-end mt-4">
           <button type="submit" disabled={isLoading}
-            className="px-6 py-2.5 bg-accent-cyan hover:bg-accent-cyan/80 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2 disabled:opacity-50">
+            className="w-full sm:w-auto px-6 py-3 md:py-2.5 bg-accent-cyan hover:bg-accent-cyan/80 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50">
             {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Globe className="w-4 h-4" />}
             {t('geo.runScan')}
           </button>
@@ -101,11 +101,11 @@ export default function GeoArbitrage() {
       {results && !isLoading && (
         <>
           {cheapestMarket && (
-            <div className="glass rounded-xl p-5 border border-accent-green/30 glow-green">
-              <div className="flex items-center justify-between">
+            <div className="glass rounded-xl p-4 md:p-5 border border-accent-green/30 glow-green">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div>
                   <div className="text-[10px] text-accent-green uppercase tracking-wider font-semibold mb-1">{t('geo.cheapestFound')}</div>
-                  <div className="text-xl font-bold text-white">{cheapestMarket.market} ({cheapestMarket.currency})</div>
+                  <div className="text-lg md:text-xl font-bold text-white">{cheapestMarket.market} ({cheapestMarket.currency})</div>
                   <div className="text-sm text-gray-400 mt-1">
                     {formatPrice(cheapestMarket.cheapestPrice)} — {t('geo.saveUpTo')} {cheapestMarket.savings}% {t('geo.vsOther')}
                   </div>
@@ -123,11 +123,14 @@ export default function GeoArbitrage() {
             </div>
           )}
 
+          {/* Market Comparison — card layout on mobile, table on desktop */}
           <div className="glass rounded-xl overflow-hidden">
             <div className="px-4 py-3 border-b border-border-subtle">
               <h3 className="text-sm font-semibold text-white">{t('geo.marketComparison')} — {searchParams?.origin} → {searchParams?.destination}</h3>
             </div>
-            <div className="overflow-x-auto">
+
+            {/* Desktop table */}
+            <div className="hidden md:block overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border-subtle">
@@ -181,13 +184,49 @@ export default function GeoArbitrage() {
                 </tbody>
               </table>
             </div>
+
+            {/* Mobile card layout */}
+            <div className="md:hidden divide-y divide-border-subtle">
+              {results.map((r, i) => {
+                const isCheapest = i === 0;
+                const colorClass = vpnColors[r.market] || 'bg-gray-500/10 text-gray-400 border-gray-500/20';
+                const links = generateAllLinks({ origin: searchParams.origin, destination: searchParams.destination, departDate: searchParams.departDate, cabin: 'economy' });
+                return (
+                  <div key={r.market} className={cn('p-3 space-y-2', isCheapest ? 'bg-accent-green/5' : '')}>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg">{getFlag(r.countryCode)}</span>
+                        <span className={cn('font-medium text-sm', isCheapest ? 'text-accent-green' : 'text-white')}>{r.market}</span>
+                        {isCheapest && <span className="text-[9px] bg-accent-green/20 text-accent-green px-1.5 py-0.5 rounded font-bold">{t('geo.best')}</span>}
+                      </div>
+                      <span className={cn('text-sm font-bold', isCheapest ? 'text-accent-green' : 'text-white')}>{formatPrice(r.cheapestPrice)}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-2">
+                        <span className="text-gray-500 font-mono">{r.currency}</span>
+                        {r.savings > 0 && <span className="text-accent-green font-medium">-{r.savings}%</span>}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {r.vpnLocation && (
+                          <span className={cn('px-2 py-0.5 rounded text-[10px] font-medium border', colorClass)}>{r.vpnLocation}</span>
+                        )}
+                        <a href={links['Google Flights']} target="_blank" rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 px-2 py-1 rounded bg-surface-hover text-[10px] text-gray-400">
+                          <ExternalLink className="w-3 h-3" /> Search
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
 
-          <div className="glass rounded-xl p-5">
+          <div className="glass rounded-xl p-4 md:p-5">
             <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
               <Wifi className="w-4 h-4 text-accent-amber" /> {t('geo.vpnGuide')}
             </h3>
-            <div className="grid grid-cols-3 gap-3 text-xs text-gray-400">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs text-gray-400">
               <div className="bg-surface-hover rounded-lg p-3 border border-border-subtle">
                 <div className="text-white font-medium mb-1">{t('geo.step1Title')}</div>
                 <p>{t('geo.step1Desc')}</p>
@@ -203,7 +242,6 @@ export default function GeoArbitrage() {
             </div>
           </div>
 
-          {/* Geo-Proxy Navigator — appears when cheapest market is found */}
           {cheapestMarket && searchParams && (
             <GeoProxy
               searchParams={{
