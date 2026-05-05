@@ -1,0 +1,48 @@
+name: Daily Flight Stalker
+
+on:
+  schedule:
+    # Runs every day at 01:00 AM UTC (04:00 AM Riyadh / AST)
+    - cron: '0 1 * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run (search only, no email)'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
+
+jobs:
+  stalk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        working-directory: scripts/daily-stalker
+        run: npm ci
+
+      - name: Run Daily Stalker
+        working-directory: scripts/daily-stalker
+        env:
+          RAPIDAPI_KEY: ${{ secrets.RAPIDAPI_KEY }}
+          AMADEUS_API_KEY: ${{ secrets.AMADEUS_API_KEY }}
+          AMADEUS_API_SECRET: ${{ secrets.AMADEUS_API_SECRET }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          EMAIL_TO: ${{ secrets.EMAIL_TO }}
+          DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
+        run: node index.js

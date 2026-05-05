@@ -137,6 +137,15 @@ export const airports = [
   { code: 'MEL', name: 'Melbourne Tullamarine', city: 'Melbourne', country: 'AU', entityId: '95673541', skyId: 'MELA', lat: -37.67, lng: 144.84 },
   { code: 'AKL', name: 'Auckland Airport', city: 'Auckland', country: 'NZ', entityId: '95673371', skyId: 'AKLA', lat: -37.01, lng: 174.79 },
 
+  // ─── Europe — Eastern (additional) ───
+  { code: 'BTS', name: 'M. R. Stefanik', city: 'Bratislava', country: 'SK', entityId: '95673424', skyId: 'BTSA', lat: 48.17, lng: 17.21 },
+  { code: 'TGD', name: 'Podgorica Airport', city: 'Podgorica', country: 'ME', entityId: '95673741', skyId: 'TGDA', lat: 42.36, lng: 19.25 },
+  { code: 'TIV', name: 'Tivat Airport', city: 'Tivat', country: 'ME', entityId: '95673746', skyId: 'TIVA', lat: 42.40, lng: 18.72 },
+
+  // ─── Russia ───
+  { code: 'SVO', name: 'Sheremetyevo', city: 'Moscow', country: 'RU', entityId: '95673733', skyId: 'SVOA', lat: 55.97, lng: 37.41 },
+  { code: 'LED', name: 'Pulkovo', city: 'St Petersburg', country: 'RU', entityId: '95673521', skyId: 'LEDA', lat: 59.80, lng: 30.27 },
+
   // ─── Central Asia / CIS ───
   { code: 'TBS', name: 'Tbilisi Intl', city: 'Tbilisi', country: 'GE', entityId: '95673739', skyId: 'TBSA', lat: 41.67, lng: 44.95 },
   { code: 'GYD', name: 'Heydar Aliyev', city: 'Baku', country: 'AZ', entityId: '95673473', skyId: 'GYDA', lat: 40.47, lng: 50.05 },
