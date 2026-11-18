@@ -75,7 +75,7 @@ data/
 1. **User input** → `searchParams` state in page component
 2. **TanStack Query hook** (`useFlightSearch`, `useGeoArbitrage`, etc.) keyed on `searchParams`
 3. **API client** (`flightEngine.searchFlightOffers`) tries live APIs, falls back to simulation
-4. **Multi-source aggregation**: flights get tagged with `source: 'skyscanner'|'amadeus'|'google_flights'|'trip_com'|'kayak'|'simulated'`
+4. **Multi-source aggregation**: live flights are tagged `source: 'skyscanner'|'amadeus'`; fallback flights are `source: 'simulated'`
 5. **Value Score** computed: `(comfort + loyaltyPoints/100) / (price * duration/60)`
 6. **UI** sorts by value/price/duration
 
@@ -181,7 +181,7 @@ When adding a new user-visible string, add it to **both** `en` and `ar` objects.
 Airport search uses a 3-tier fallback (Skyscanner → Amadeus → static DB). The critical detail: **Skyscanner requires numeric entity IDs, not IATA codes**. The static DB in `data/airports.js` includes real Skyscanner entity IDs, and `airportByCode` is used to enrich Amadeus results. When adding airports, always include `entityId` / `skyId`.
 
 ### Flight simulation
-`lib/api/flightEngine.js` generates deterministic simulated flights using a seed derived from route + date. Flights are tagged with random source labels from `SIM_SOURCES` so the UI shows visual diversity across "Skyscanner / Amadeus / Google / Trip.com / Kayak". Real API calls are attempted first; simulation is the fallback.
+`lib/api/flightEngine.js` generates deterministic simulated flights (seed = route + date) ONLY when no live API returns data. They are tagged `source: 'simulated'`, `simulated: true` and the UI shows a `SimulationNotice`. Never label simulated data with a real provider name. See "Price Integrity Rules".
 
 ### Geo-pricing (POS markets)
 Eight Point-of-Sale markets: `SA, IN, TR, EG, IL, PK, PH, US`. Each has a currency, VPN city, and flag. `GeoProxy.jsx` generates platform-specific URLs with `market` / `currency` / `hl` params and instructs the user to switch VPN + incognito.
