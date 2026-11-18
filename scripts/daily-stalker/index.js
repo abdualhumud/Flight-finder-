@@ -1,123 +1,107 @@
 #!/usr/bin/env node
-
 /**
- * Daily Flight Stalker — Autonomous Agent
+ * Daily Flight Stalker — scans the destination whitelist from Riyadh and emails a report.
  *
- * Scans 15 destinations from Riyadh, finds the cheapest fares across
- * Skyscanner + Amadeus + simulation, and emails an intelligence report.
- *
- * Usage:
- *   node index.js              # Full run (search + email)
- *   DRY_RUN=true node index.js # Search only, print to console
+ *   node index.js                 full run (search + email)
+ *   DRY_RUN=true node index.js    search only; writes report.html next to this file
  */
 
+import { writeFileSync } from 'node:fs';
 import { ORIGIN, DESTINATIONS } from './destinations.js';
-import { searchAllDestinations } from './searcher.js';
-import { buildEmailHTML } from './emailTemplate.js';
+import { searchAllDestinations, getRunStats } from './searcher.js';
+import { buildEmailHTML, formatDuration } from './emailTemplate.js';
 import { createMailer, sendReport } from './mailer.js';
 
-const SEARCH_DAYS_MIN = parseInt(process.env.SEARCH_DAYS_MIN || '30', 10);
-const SEARCH_DAYS_MAX = parseInt(process.env.SEARCH_DAYS_MAX || '60', 10);
+const toInt = (v, d) => { const n = parseInt(v, 10); return Number.isFinite(n) && n > 0 ? n : d; };
+
+const MIN = toInt(process.env.SEARCH_DAYS_MIN, 30);
+const MAX = Math.max(toInt(process.env.SEARCH_DAYS_MAX, 60), MIN);
+const SAMPLES = toInt(process.env.SAMPLE_DATES, 3);
 const DRY_RUN = process.env.DRY_RUN === 'true';
 
-function generateSearchDates() {
-  const dates = [];
-  const now = new Date();
+const isoDay = (offset) => {
+  const d = new Date();
+  d.setUTCDate(d.getUTCDate() + offset);
+  return d.toISOString().split('T')[0];
+};
 
-  for (let offset = SEARCH_DAYS_MIN; offset <= SEARCH_DAYS_MAX; offset += 5) {
-    const d = new Date(now);
-    d.setDate(d.getDate() + offset);
-    dates.push(d.toISOString().split('T')[0]);
-  }
-
-  return dates;
+/** Evenly spread SAMPLES dates across [MIN, MAX] days from today. */
+function sampleDates() {
+  if (SAMPLES === 1) return [isoDay(Math.round((MIN + MAX) / 2))];
+  return [...new Set(Array.from({ length: SAMPLES }, (_, i) => isoDay(Math.round(MIN + (i * (MAX - MIN)) / (SAMPLES - 1)))))];
 }
 
 function printSummary(results) {
-  const sorted = [...results]
-    .filter(r => r.cheapest)
-    .sort((a, b) => a.cheapest.price - b.cheapest.price);
-
-  console.log('\n┌─────────────────────────────────────────────────────────────────┐');
-  console.log('│  ✈️  DAILY FLIGHT INTELLIGENCE REPORT                          │');
-  console.log('├──────────────────────┬──────────┬─────────┬──────┬─────────────┤');
-  console.log('│ Destination          │ Price    │ Airline │ Dur  │ Source      │');
-  console.log('├──────────────────────┼──────────┼─────────┼──────┼─────────────┤');
-
-  for (const r of sorted) {
-    const c = r.cheapest;
-    const dest = `${r.destination.name}`.padEnd(20);
-    const price = `SAR ${c.price}`.padEnd(8);
-    const airline = c.airline.slice(0, 7).padEnd(7);
-    const dur = `${Math.floor(c.duration / 60)}h${c.duration % 60 > 0 ? c.duration % 60 + 'm' : ''}`.padEnd(4);
-    const source = c.source.padEnd(11);
-    console.log(`│ ${dest} │ ${price} │ ${airline} │ ${dur} │ ${source} │`);
-  }
-
-  console.log('└──────────────────────┴──────────┴─────────┴──────┴─────────────┘');
-
-  const failed = results.filter(r => !r.cheapest);
-  if (failed.length) {
-    console.log(`\n⚠️  No results for: ${failed.map(f => f.destination.name).join(', ')}`);
-  }
+  const rows = results.map(r => ({
+    Destination: r.destination.name,
+    Price: r.cheapest ? `SAR ${Math.round(r.cheapest.price)}${r.simulated ? ' (est)' : ''}` : '—',
+    Provider: r.cheapest?.source ?? '—',
+    Airline: r.cheapest?.airline ?? '—',
+    Duration: r.cheapest ? formatDuration(r.cheapest.duration) : '—',
+    Date: r.cheapest ? r.bestDate : '—',
+    Errors: r.errors.length || '',
+  }));
+  rows.sort((a, b) => (parseInt(a.Price.replace(/\D/g, '')) || 1e9) - (parseInt(b.Price.replace(/\D/g, '')) || 1e9));
+  console.table(rows);
 }
 
 async function main() {
-  const startTime = Date.now();
-  const dateStr = new Date().toLocaleDateString('en-US', {
-    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
-  });
+  const t0 = Date.now();
+  const dateStr = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+  const dates = sampleDates();
+  const window = { from: isoDay(MIN), to: isoDay(MAX) };
+
+  const have = [
+    process.env.RAPIDAPI_KEY && 'Skyscanner',
+    process.env.AMADEUS_API_KEY && process.env.AMADEUS_API_SECRET && 'Amadeus',
+  ].filter(Boolean);
 
   console.log(`\n🔍 Daily Flight Stalker — ${dateStr}`);
-  console.log(`   Origin: ${ORIGIN.name} (${ORIGIN.code})`);
-  console.log(`   Destinations: ${DESTINATIONS.length}`);
-  console.log(`   Search window: ${SEARCH_DAYS_MIN}–${SEARCH_DAYS_MAX} days out`);
+  console.log(`   ${ORIGIN.name} → ${DESTINATIONS.length} destinations | window ${window.from} … ${window.to} | sampled dates: ${dates.join(', ')}`);
+  console.log(`   Live sources configured: ${have.join(', ') || 'NONE'}${process.env.ALLOW_SIMULATION === 'true' ? ' (+ simulation enabled)' : ''}`);
+  if (!have.length && process.env.ALLOW_SIMULATION !== 'true') {
+    console.warn('   ⚠️  No price API keys set — the report will contain booking links only. Set RAPIDAPI_KEY and/or AMADEUS_API_KEY/SECRET.');
+  }
 
-  // Generate dates to scan (every 5 days within the window)
-  const dates = generateSearchDates();
-  console.log(`   Scanning ${dates.length} dates per destination...\n`);
+  const results = await searchAllDestinations(ORIGIN, DESTINATIONS, dates, window);
+  const stats = getRunStats();
 
-  // Search all destinations in parallel
-  const results = await searchAllDestinations(ORIGIN, DESTINATIONS, dates);
-
-  const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-  console.log(`\n✅ Search complete in ${elapsed}s`);
-
+  console.log(`\n✅ Search finished in ${((Date.now() - t0) / 1000).toFixed(1)}s — API calls: Skyscanner ${stats.skyCalls}, Amadeus ${stats.amaCalls}`);
   printSummary(results);
 
-  // Build email
-  const html = buildEmailHTML(results, dateStr);
+  const errors = results.flatMap(r => r.errors.map(e => `${r.destination.code}: ${e}`));
+  if (errors.length) {
+    console.warn(`\n⚠️  ${errors.length} source error(s):`);
+    [...new Set(errors)].slice(0, 20).forEach(e => console.warn(`   - ${e}`));
+  }
+
+  const html = buildEmailHTML(results, dateStr, stats);
 
   if (DRY_RUN) {
-    console.log('\n📧 DRY RUN — Email HTML saved to stdout (pipe to file to preview):');
-    console.log('--- EMAIL HTML START ---');
-    console.log(html);
-    console.log('--- EMAIL HTML END ---');
+    const out = new URL('./report.html', import.meta.url);
+    writeFileSync(out, html);
+    console.log(`\n📄 DRY RUN — report written to ${out.pathname} (no email sent)`);
     return;
   }
 
-  // Send email
   const transporter = createMailer();
   if (!transporter) {
-    console.error('\n❌ Email not configured. Set SMTP_HOST, SMTP_USER, SMTP_PASS in .env');
-    console.log('   Run with DRY_RUN=true to see the report without sending email.');
+    console.error('\n❌ Email not configured. Set SMTP_HOST, SMTP_USER and SMTP_PASS (see .env.example).');
     process.exit(1);
   }
 
+  const anySimulated = results.some(r => r.simulated);
+  const noLive = results.every(r => !r.cheapest || r.simulated);
+  const tag = noLive ? (anySimulated ? '[ESTIMATES] ' : '[NO LIVE DATA] ') : '';
   const to = process.env.EMAIL_TO || 'alhumudab@gmail.com';
-  const subject = `✈️ Your Daily Flight Intelligence Report - ${new Date().toISOString().split('T')[0]}`;
+  const subject = `${tag}✈️ Your Daily Flight Intelligence Report - ${new Date().toISOString().split('T')[0]}`;
 
-  try {
-    console.log(`\n📧 Sending report to ${to}...`);
-    const messageId = await sendReport({ transporter, to, subject, html });
-    console.log(`✅ Email sent! Message ID: ${messageId}`);
-  } catch (e) {
-    console.error(`❌ Failed to send email: ${e.message}`);
-    process.exit(1);
-  }
+  console.log(`\n📧 Sending report to ${to}…`);
+  const id = await sendReport({ transporter, to, subject, html });
+  console.log(`✅ Email sent (${id})`);
 }
 
 main().catch(e => {
-  console.error('💥 Fatal error:', e);
+  console.error('💥 Fatal:', e.message);
   process.exit(1);
 });

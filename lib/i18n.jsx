@@ -108,6 +108,7 @@ const translations = {
     'flight.source': 'Source:',
     'flight.live': 'LIVE',
     'flight.simulated': 'SIM',
+    'flight.simulatedNotice': 'Demo data: no live price API key is configured, so these prices are simulated estimates, not real fares. Use the booking links to see actual prices.',
     'flight.seats': 'seats',
 
     // Geo-Pricing
@@ -314,6 +315,7 @@ const translations = {
     'flight.source': 'المصدر:',
     'flight.live': 'مباشر',
     'flight.simulated': 'محاكاة',
+    'flight.simulatedNotice': 'بيانات تجريبية: لا يوجد مفتاح API للأسعار الحية، لذلك هذه الأسعار تقديرية وليست أسعار حقيقية. استخدم روابط الحجز لمعرفة السعر الفعلي.',
     'flight.seats': 'مقاعد',
 
     // Geo-Pricing

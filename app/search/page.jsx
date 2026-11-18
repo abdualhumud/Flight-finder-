@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { Search, Plane, ArrowRightLeft, Users, SlidersHorizontal, Sparkles, MapPin, Calendar, Grid3x3, Loader2, Globe, Wifi } from 'lucide-react';
+import SimulationNotice from '../../components/SimulationNotice';
 import { useInfiniteFlights, useGeoArbitrage } from '../../lib/hooks/useFlightSearch';
 import { calculateValueScore, formatPrice, cn } from '../../lib/utils';
 import FlightTable from '../../components/FlightTable';
@@ -388,6 +389,8 @@ export default function HackerLab() {
           </div>
         </div>
       )}
+
+      {data?.pages?.[0]?.source === 'simulated' && <SimulationNotice />}
 
       <FlightTable flights={allFlights} loading={isLoading} showLoadMore={hasNextPage} onLoadMore={() => fetchNextPage()}
         flags={data?.pages?.[0]?.flags || []} />

@@ -1,291 +1,358 @@
 /**
  * Multi-source flight searcher.
- * Tries: Skyscanner (RapidAPI) → Amadeus → Simulation fallback.
- * Each source is independent — a failure in one does not block the others.
+ *
+ * Sources:
+ *   - Skyscanner (RapidAPI "Sky Scrapper")  — live prices, needs RAPIDAPI_KEY
+ *   - Amadeus Self-Service                  — live prices, needs AMADEUS_API_KEY/SECRET
+ *   - Google Flights / Trip.com             — NO public price API: deep-links only
+ *
+ * Rules that protect the user from bad prices:
+ *   1. Live and simulated data are NEVER mixed. Simulation is OFF unless ALLOW_SIMULATION=true,
+ *      and simulated rows are always flagged.
+ *   2. Prices <= 0, non-SAR currencies and non-finite numbers are discarded.
+ *   3. Suspiciously low fares (<40% of the median) and cross-source disagreements (>30%)
+ *      are flagged "verify before booking".
+ *   4. Every failure is recorded (never swallowed) and surfaced in the report.
+ *   5. All HTTP goes through one global concurrency limiter + retry/backoff on 429/5xx.
  */
 
 const RAPIDAPI_HOST = 'sky-scrapper.p.rapidapi.com';
-const AMADEUS_BASE = 'https://api.amadeus.com';
 
-let amadeusToken = null;
-let amadeusTokenExpiry = 0;
+// ─── Config (read lazily so tests / CI can set env at runtime) ───
 
-// ─── Skyscanner ───
+const int = (v, d) => { const n = parseInt(v, 10); return Number.isFinite(n) && n >= 0 ? n : d; };
 
-async function searchSkyscanner(origin, dest, departDate) {
-  const key = process.env.RAPIDAPI_KEY;
-  if (!key) return null;
+export function getConfig() {
+  const e = process.env;
+  return {
+    rapidKey: e.RAPIDAPI_KEY || '',
+    amaKey: e.AMADEUS_API_KEY || '',
+    amaSecret: e.AMADEUS_API_SECRET || '',
+    amaBase: e.AMADEUS_ENV === 'test' ? 'https://test.api.amadeus.com' : 'https://api.amadeus.com',
+    allowSim: e.ALLOW_SIMULATION === 'true',
+    concurrency: Math.max(1, int(e.CONCURRENCY, 4)),
+    skyBudget: int(e.SKYSCANNER_MAX_CALLS, 45),
+    retryBaseMs: int(e.RETRY_BASE_MS, 1000),
+    timeoutMs: int(e.HTTP_TIMEOUT_MS, 20000),
+  };
+}
 
+// ─── Run statistics (surfaced in the report) ───
+
+const stats = { skyCalls: 0, skyBudgetHit: false, amaCalls: 0, idsUnverified: new Set() };
+export function getRunStats() { return { ...stats, idsUnverified: [...stats.idsUnverified] }; }
+
+// ─── Global concurrency limiter ───
+
+let limiter = null;
+function limit(fn) {
+  if (!limiter) {
+    const max = getConfig().concurrency;
+    let active = 0;
+    const queue = [];
+    const next = () => {
+      if (active >= max || !queue.length) return;
+      active++;
+      const { fn, resolve, reject } = queue.shift();
+      fn().then(resolve, reject).finally(() => { active--; next(); });
+    };
+    limiter = (f) => new Promise((resolve, reject) => { queue.push({ fn: f, resolve, reject }); next(); });
+  }
+  return limiter(fn);
+}
+
+// ─── HTTP with retry/backoff (keys never appear in thrown messages) ───
+
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+async function httpJson(url, init, label) {
+  const { retryBaseMs, timeoutMs } = getConfig();
+  let lastErr;
+  for (let attempt = 0; attempt < 4; attempt++) {
+    try {
+      const res = await fetch(url, { ...init, signal: AbortSignal.timeout(timeoutMs) });
+      if (res.ok) return await res.json();
+      const retryable = res.status === 429 || res.status >= 500;
+      const body = (await res.text().catch(() => '')).replace(/\s+/g, ' ').slice(0, 140);
+      lastErr = new Error(`${label}: HTTP ${res.status}${body ? ` — ${body}` : ''}`);
+      if (!retryable) throw Object.assign(lastErr, { fatal: true });
+      const ra = Number(res.headers.get('retry-after'));
+      await sleep(Number.isFinite(ra) && ra > 0 ? Math.min(ra * 1000, 30000) : retryBaseMs * 2 ** attempt + Math.random() * 200);
+    } catch (e) {
+      if (e.fatal) throw e;
+      lastErr = lastErr && lastErr.message.startsWith(label) ? lastErr : new Error(`${label}: ${e.name === 'TimeoutError' ? 'timeout' : e.message}`);
+      await sleep(retryBaseMs * 2 ** attempt);
+    }
+  }
+  throw lastErr;
+}
+
+// ─── Result validation ───
+
+function clean(results) {
+  return (results || []).filter(r =>
+    r && Number.isFinite(r.price) && r.price > 0 && (r.currency || 'SAR') === 'SAR'
+  );
+}
+
+// ─── Skyscanner (RapidAPI) ───
+
+const idCache = new Map();
+
+/** Entity IDs must be real Skyscanner IDs. Resolve them live; fall back to the static table (flagged). */
+function resolveSkyIds(place) {
+  if (idCache.has(place.code)) return idCache.get(place.code);
+  const p = (async () => {
+    const { rapidKey } = getConfig();
+    try {
+      const data = await limit(() => httpJson(
+        `https://${RAPIDAPI_HOST}/api/v1/flights/searchAirport?query=${encodeURIComponent(place.name)}&locale=en-US`,
+        { headers: { 'x-rapidapi-key': rapidKey, 'x-rapidapi-host': RAPIDAPI_HOST } },
+        `Skyscanner lookup ${place.code}`,
+      ));
+      const top = data?.data?.[0];
+      const rp = top?.navigation?.relevantFlightParams || {};
+      const skyId = rp.skyId || top?.skyId;
+      const entityId = rp.entityId || top?.entityId;
+      if (skyId && entityId) return { skyId, entityId };
+    } catch { /* fall back below */ }
+    stats.idsUnverified.add(place.code);
+    return { skyId: place.skyId, entityId: place.entityId };
+  })();
+  idCache.set(place.code, p);
+  return p;
+}
+
+async function searchSkyscanner(origin, dest, date) {
+  const { rapidKey, skyBudget } = getConfig();
+  if (!rapidKey) return null;
+  if (stats.skyCalls >= skyBudget) { stats.skyBudgetHit = true; return null; }
+  stats.skyCalls++;
+
+  const [o, d] = await Promise.all([resolveSkyIds(origin), resolveSkyIds(dest)]);
   const url = new URL(`https://${RAPIDAPI_HOST}/api/v2/flights/searchFlightsComplete`);
-  url.searchParams.set('originSkyId', origin.skyId);
-  url.searchParams.set('destinationSkyId', dest.skyId);
-  url.searchParams.set('originEntityId', origin.entityId);
-  url.searchParams.set('destinationEntityId', dest.entityId);
-  url.searchParams.set('date', departDate);
-  url.searchParams.set('cabinClass', 'economy');
-  url.searchParams.set('adults', '1');
-  url.searchParams.set('market', 'SA');
-  url.searchParams.set('currency', 'SAR');
+  const q = {
+    originSkyId: o.skyId, destinationSkyId: d.skyId,
+    originEntityId: o.entityId, destinationEntityId: d.entityId,
+    date, cabinClass: 'economy', adults: '1', currency: 'SAR', market: 'en-US', countryCode: 'SA',
+  };
+  for (const [k, v] of Object.entries(q)) url.searchParams.set(k, v);
 
-  const res = await fetch(url.toString(), {
-    headers: { 'x-rapidapi-key': key, 'x-rapidapi-host': RAPIDAPI_HOST },
-    signal: AbortSignal.timeout(15000),
-  });
+  const data = await limit(() => httpJson(
+    url.toString(),
+    { headers: { 'x-rapidapi-key': rapidKey, 'x-rapidapi-host': RAPIDAPI_HOST } },
+    `Skyscanner ${dest.code} ${date}`,
+  ));
 
-  if (!res.ok) return null;
-  const data = await res.json();
-  if (!data?.data?.itineraries?.length) return null;
-
-  return data.data.itineraries.map((itin, i) => {
+  return clean((data?.data?.itineraries || []).map(itin => {
     const leg = itin.legs?.[0];
     if (!leg) return null;
     const seg = leg.segments?.[0];
     return {
       source: 'Skyscanner',
-      price: itin.price?.raw || 0,
+      date,
+      price: Number(itin.price?.raw),
       currency: 'SAR',
       airline: seg?.marketingCarrier?.name || seg?.operatingCarrier?.name || 'Unknown',
       duration: leg.durationInMinutes || 0,
       stops: leg.stopCount || 0,
       departure: leg.departure || '',
       arrival: leg.arrival || '',
-      deepLink: itin.price?.url || null,
+      deepLink: null,
     };
-  }).filter(Boolean);
+  }));
 }
 
 // ─── Amadeus ───
 
-async function getAmadeusToken() {
-  if (amadeusToken && Date.now() < amadeusTokenExpiry) return amadeusToken;
+let tokenPromise = null;
+let tokenExpiry = 0;
 
-  const key = process.env.AMADEUS_API_KEY;
-  const secret = process.env.AMADEUS_API_SECRET;
-  if (!key || !secret) return null;
-
-  const res = await fetch(`${AMADEUS_BASE}/v1/security/oauth2/token`, {
+function getAmadeusToken() {
+  if (tokenPromise && Date.now() < tokenExpiry) return tokenPromise;
+  const { amaKey, amaSecret, amaBase } = getConfig();
+  if (!amaKey || !amaSecret) return Promise.resolve(null);
+  tokenExpiry = Date.now() + 60_000; // provisional; replaced when the response arrives
+  // One shared in-flight promise → 15 parallel destinations make ONE token request, not 15.
+  tokenPromise = limit(() => httpJson(`${amaBase}/v1/security/oauth2/token`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: `grant_type=client_credentials&client_id=${key}&client_secret=${secret}`,
-    signal: AbortSignal.timeout(10000),
-  });
-
-  if (!res.ok) return null;
-  const data = await res.json();
-  amadeusToken = data.access_token;
-  amadeusTokenExpiry = Date.now() + (data.expires_in - 60) * 1000;
-  return amadeusToken;
+    body: new URLSearchParams({ grant_type: 'client_credentials', client_id: amaKey, client_secret: amaSecret }),
+  }, 'Amadeus auth')).then(d => {
+    tokenExpiry = Date.now() + Math.max((d.expires_in || 1800) - 60, 60) * 1000;
+    return d.access_token;
+  }).catch(e => { tokenPromise = null; tokenExpiry = 0; throw e; });
+  return tokenPromise;
 }
 
-async function searchAmadeus(origin, dest, departDate) {
+async function amadeusGet(path, params, label) {
   const token = await getAmadeusToken();
   if (!token) return null;
+  stats.amaCalls++;
+  const { amaBase } = getConfig();
+  return limit(() => httpJson(`${amaBase}${path}?${new URLSearchParams(params)}`, { headers: { Authorization: `Bearer ${token}` } }, label));
+}
 
-  const params = new URLSearchParams({
-    originLocationCode: origin.code,
-    destinationLocationCode: dest.code,
-    departureDate: departDate,
-    adults: '1',
-    travelClass: 'ECONOMY',
-    currencyCode: 'SAR',
-    max: '10',
-    nonStop: 'false',
-  });
+/** ONE call returns the cheapest fare per departure date across the whole window. */
+async function amadeusCheapestDates(origin, dest, fromDate, toDate) {
+  const data = await amadeusGet('/v1/shopping/flight-dates', {
+    origin: origin.code, destination: dest.code, departureDate: `${fromDate},${toDate}`, oneWay: 'true',
+  }, `Amadeus calendar ${dest.code}`);
+  return (data?.data || [])
+    .map(x => ({ date: x.departureDate, price: Number(x.price?.total) }))
+    .filter(x => x.date && x.price > 0)
+    .sort((a, b) => a.price - b.price);
+}
 
-  const res = await fetch(`${AMADEUS_BASE}/v2/shopping/flight-offers?${params}`, {
-    headers: { Authorization: `Bearer ${token}` },
-    signal: AbortSignal.timeout(15000),
-  });
+async function searchAmadeus(origin, dest, date) {
+  const data = await amadeusGet('/v2/shopping/flight-offers', {
+    originLocationCode: origin.code, destinationLocationCode: dest.code, departureDate: date,
+    adults: '1', travelClass: 'ECONOMY', currencyCode: 'SAR', max: '10', nonStop: 'false',
+  }, `Amadeus offers ${dest.code} ${date}`);
+  if (!data) return null;
 
-  if (!res.ok) return null;
-  const data = await res.json();
-  if (!data?.data?.length) return null;
-
-  return data.data.map(offer => {
+  return clean((data.data || []).map(offer => {
     const outbound = offer.itineraries?.[0];
     const segs = outbound?.segments || [];
-    const firstSeg = segs[0] || {};
-    const lastSeg = segs[segs.length - 1] || {};
-    const durationMatch = (outbound?.duration || '').match(/PT(?:(\d+)H)?(?:(\d+)M)?/);
-    const duration = durationMatch
-      ? (parseInt(durationMatch[1] || 0) * 60) + parseInt(durationMatch[2] || 0)
-      : 0;
-
+    const first = segs[0] || {};
+    const last = segs[segs.length - 1] || {};
+    const m = (outbound?.duration || '').match(/PT(?:(\d+)H)?(?:(\d+)M)?/);
     return {
       source: 'Amadeus',
-      price: parseFloat(offer.price?.total || 0),
+      date,
+      price: parseFloat(offer.price?.grandTotal || offer.price?.total),
       currency: offer.price?.currency || 'SAR',
-      airline: data.dictionaries?.carriers?.[firstSeg.carrierCode] || firstSeg.carrierCode || 'Unknown',
-      duration,
+      airline: data.dictionaries?.carriers?.[first.carrierCode] || first.carrierCode || 'Unknown',
+      duration: m ? parseInt(m[1] || 0, 10) * 60 + parseInt(m[2] || 0, 10) : 0,
       stops: Math.max(segs.length - 1, 0),
-      departure: firstSeg.departure?.at || '',
-      arrival: lastSeg.arrival?.at || '',
+      departure: first.departure?.at || '',
+      arrival: last.arrival?.at || '',
       deepLink: null,
+    };
+  }));
+}
+
+// ─── Simulation (OFF by default — only for demos/dry-runs) ───
+
+const hashCode = (str) => { let h = 0; for (let i = 0; i < str.length; i++) { h = ((h << 5) - h) + str.charCodeAt(i); h |= 0; } return h; };
+const seeded = (seed) => { let s = Math.abs(seed) || 1; return () => { s = (s * 16807) % 2147483647; return (s - 1) / 2147483646; }; };
+
+function simulate(origin, dest, date) {
+  const rand = seeded(hashCode(`${date}${origin.code}${dest.code}`));
+  const base = 1200 + Math.abs(hashCode(dest.code)) % 1800;
+  return Array.from({ length: 5 }, () => {
+    const stops = rand() > 0.55 ? 0 : rand() > 0.4 ? 1 : 2;
+    const duration = Math.round((300 + Math.abs(hashCode(dest.code)) % 300) * (0.85 + rand() * 0.35)) + stops * 90;
+    return {
+      source: 'Simulated', date, simulated: true,
+      price: Math.round(base * (0.55 + rand())), currency: 'SAR',
+      airline: 'Estimate', duration, stops, departure: date, arrival: '', deepLink: null,
     };
   });
 }
 
-// ─── Simulation (deterministic fallback) ───
+// ─── Booking / verification links (these are search links, not price sources) ───
 
-const ROUTE_DATA = {
-  'RUH-AMS': { basePrice: 2050, baseDuration: 400, airlines: ['KLM', 'Turkish Airlines', 'Saudi Airlines'] },
-  'RUH-BCN': { basePrice: 1950, baseDuration: 380, airlines: ['Turkish Airlines', 'Saudi Airlines', 'Lufthansa'] },
-  'RUH-MAD': { basePrice: 1900, baseDuration: 390, airlines: ['Turkish Airlines', 'Saudi Airlines', 'Emirates'] },
-  'RUH-PRG': { basePrice: 2050, baseDuration: 370, airlines: ['Turkish Airlines', 'Saudi Airlines', 'Lufthansa'] },
-  'RUH-WAW': { basePrice: 1850, baseDuration: 360, airlines: ['Turkish Airlines', 'Saudi Airlines', 'Lufthansa'] },
-  'RUH-LIS': { basePrice: 2100, baseDuration: 420, airlines: ['Turkish Airlines', 'Saudi Airlines', 'Emirates'] },
-  'RUH-TGD': { basePrice: 1750, baseDuration: 380, airlines: ['Turkish Airlines', 'Saudi Airlines'] },
-  'RUH-JNB': { basePrice: 2800, baseDuration: 540, airlines: ['Saudi Airlines', 'Emirates', 'Ethiopian'] },
-  'RUH-CPT': { basePrice: 3100, baseDuration: 600, airlines: ['Emirates', 'Ethiopian', 'Qatar Airways'] },
-  'RUH-BTS': { basePrice: 1900, baseDuration: 370, airlines: ['Turkish Airlines', 'Saudi Airlines', 'Lufthansa'] },
-  'RUH-SGN': { basePrice: 1900, baseDuration: 600, airlines: ['Emirates', 'Qatar Airways', 'Singapore Airlines'] },
-  'RUH-HAN': { basePrice: 1850, baseDuration: 580, airlines: ['Emirates', 'Qatar Airways', 'Turkish Airlines'] },
-  'RUH-BKK': { basePrice: 1650, baseDuration: 540, airlines: ['Saudi Airlines', 'Emirates', 'Gulf Air'] },
-  'RUH-LHR': { basePrice: 1800, baseDuration: 390, airlines: ['Saudi Airlines', 'British Airways', 'Emirates'] },
-  'RUH-SVO': { basePrice: 1600, baseDuration: 330, airlines: ['Saudi Airlines', 'Turkish Airlines', 'Emirates'] },
-};
-
-function seededRandom(seed) {
-  let s = Math.abs(seed) || 1;
-  return () => { s = (s * 16807) % 2147483647; return (s - 1) / 2147483646; };
-}
-
-function hashCode(str) {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    hash = ((hash << 5) - hash) + str.charCodeAt(i);
-    hash |= 0;
-  }
-  return hash;
-}
-
-function simulateFlights(origin, dest, departDate) {
-  const key = `${origin.code}-${dest.code}`;
-  const route = ROUTE_DATA[key] || { basePrice: 2000, baseDuration: 400, airlines: ['Emirates', 'Turkish Airlines'] };
-  const rand = seededRandom(Math.abs(hashCode(departDate + key)));
-
-  const results = [];
-  for (let i = 0; i < 5; i++) {
-    const variation = 0.55 + rand() * 1.0;
-    const stops = rand() > 0.55 ? 0 : rand() > 0.4 ? 1 : 2;
-    const stopExtra = stops * (45 + Math.floor(rand() * 120));
-    const duration = Math.round(route.baseDuration * (0.85 + rand() * 0.35)) + stopExtra;
-    const price = Math.round(route.basePrice * variation);
-
-    const depHour = 1 + Math.floor(rand() * 22);
-    const depMin = Math.floor(rand() * 4) * 15;
-    const depTime = `${departDate}T${String(depHour).padStart(2, '0')}:${String(depMin).padStart(2, '0')}:00`;
-    const arrTime = new Date(new Date(depTime).getTime() + duration * 60000).toISOString();
-
-    results.push({
-      source: 'Simulated',
-      price,
-      currency: 'SAR',
-      airline: route.airlines[i % route.airlines.length],
-      duration,
-      stops,
-      departure: depTime,
-      arrival: arrTime,
-      deepLink: null,
-    });
-  }
-
-  return results;
-}
-
-// ─── Deep link generators ───
-
-function googleFlightsLink(origin, dest, date) {
-  return `https://www.google.com/travel/flights?q=flights+from+${origin}+to+${dest}&d=${date}&px=1`;
-}
-
-function skyscannerLink(origin, dest, date) {
+export function buildLinks(origin, dest, date) {
+  const o = origin.code, d = dest.code;
   const dep = date.replace(/-/g, '').slice(2);
-  return `https://www.skyscanner.com/transport/flights/${origin.toLowerCase()}/${dest.toLowerCase()}/${dep}/?adults=1&cabinclass=economy`;
+  return {
+    'Google Flights': `https://www.google.com/travel/flights?q=flights+from+${o}+to+${d}+on+${date}+one+way`,
+    'Skyscanner': `https://www.skyscanner.com/transport/flights/${o.toLowerCase()}/${d.toLowerCase()}/${dep}/?adults=1&cabinclass=economy&currency=SAR`,
+    'Trip.com': `https://www.trip.com/flights/${o.toLowerCase()}-to-${d.toLowerCase()}/tickets-${o.toLowerCase()}-${d.toLowerCase()}?dcity=${o}&acity=${d}&ddate=${date}&cabin=Economy&flighttype=ow`,
+  };
 }
 
-function tripcomLink(origin, dest, date) {
-  return `https://www.trip.com/flights/${origin.toLowerCase()}-to-${dest.toLowerCase()}/tickets-${origin.toLowerCase()}-${dest.toLowerCase()}?dcity=${origin}&acity=${dest}&ddate=${date}&cabin=Economy`;
+function primaryLink(source, links) {
+  if (source === 'Skyscanner') return { label: 'Skyscanner', url: links['Skyscanner'] };
+  // Amadeus has no consumer booking site → send the user to Google Flights to verify and book
+  return { label: 'Google Flights', url: links['Google Flights'] };
 }
 
-// ─── Public API ───
+// ─── Per-destination search ───
+
+const median = (arr) => { const s = [...arr].sort((a, b) => a - b); const m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
 
 /**
- * Search a single destination across all sources.
- * Returns { destination, cheapest, allResults, links, error? }
+ * @param {string[]} dates  sampled YYYY-MM-DD dates (used for Skyscanner and as Amadeus fallback)
+ * @param {{from:string,to:string}} window  full date window (used for the Amadeus calendar call)
  */
-export async function searchDestination(origin, dest, departDate) {
-  const results = [];
+export async function searchDestination(origin, dest, dates, window) {
   const errors = [];
+  const sources = [];
+  const cfg = getConfig();
+  const jobs = [];
 
-  // 1. Skyscanner
-  try {
-    const sky = await searchSkyscanner(origin, dest, departDate);
-    if (sky?.length) results.push(...sky);
-  } catch (e) {
-    errors.push(`Skyscanner: ${e.message}`);
+  const track = (name, promise) => jobs.push(
+    promise.then(r => { if (r?.length) sources.push(name); return r || []; })
+           .catch(e => { errors.push(e.message); return []; })
+  );
+
+  // Skyscanner: one call per sampled date
+  if (cfg.rapidKey) for (const date of dates) track('Skyscanner', searchSkyscanner(origin, dest, date));
+
+  // Amadeus: calendar call finds the cheapest days in the whole window, then price-check the best 2
+  if (cfg.amaKey && cfg.amaSecret) {
+    track('Amadeus', (async () => {
+      let pick = [];
+      try { pick = (await amadeusCheapestDates(origin, dest, window.from, window.to)).slice(0, 2).map(x => x.date); }
+      catch (e) { errors.push(e.message); }
+      if (!pick.length) pick = dates.slice(0, 2);
+      return (await Promise.all(pick.map(d => searchAmadeus(origin, dest, d).catch(e => { errors.push(e.message); return []; })))).flat();
+    })());
   }
 
-  // 2. Amadeus
-  try {
-    const ama = await searchAmadeus(origin, dest, departDate);
-    if (ama?.length) results.push(...ama);
-  } catch (e) {
-    errors.push(`Amadeus: ${e.message}`);
-  }
+  let results = (await Promise.all(jobs)).flat();
+  let simulated = false;
 
-  // 3. Simulation fallback
-  if (results.length === 0) {
-    results.push(...simulateFlights(origin, dest, departDate));
+  if (!results.length && cfg.allowSim) {
+    results = dates.flatMap(d => simulate(origin, dest, d));
+    simulated = true;
   }
 
   results.sort((a, b) => a.price - b.price);
   const cheapest = results[0] || null;
+  const date = cheapest?.date || dates[Math.floor(dates.length / 2)];
+  const links = buildLinks(origin, dest, date);
 
-  const links = {
-    'Google Flights': googleFlightsLink(origin.code, dest.code, departDate),
-    'Skyscanner': skyscannerLink(origin.code, dest.code, departDate),
-    'Trip.com': tripcomLink(origin.code, dest.code, departDate),
-  };
+  // Sanity checks
+  const flags = [];
+  if (cheapest && !simulated) {
+    if (results.length >= 4 && cheapest.price < 0.4 * median(results.map(r => r.price))) {
+      flags.push('Unusually low vs. other fares — may be an error fare or stale cache; verify before booking');
+    }
+    const bySource = {};
+    for (const r of results) bySource[r.source] = Math.min(bySource[r.source] ?? Infinity, r.price);
+    const mins = Object.values(bySource);
+    if (mins.length > 1 && Math.max(...mins) / Math.min(...mins) > 1.3) {
+      flags.push(`Sources disagree by >30% (${Object.entries(bySource).map(([k, v]) => `${k} ${Math.round(v)}`).join(' vs ')})`);
+    }
+  }
 
   return {
     destination: dest,
     cheapest,
-    allResults: results,
+    bestDate: date,
+    simulated,
+    resultCount: results.length,
+    sources: [...new Set(sources)],
+    link: cheapest ? primaryLink(cheapest.source, links) : { label: 'Google Flights', url: links['Google Flights'] },
     links,
-    errors: errors.length ? errors : undefined,
+    flags,
+    errors,
   };
 }
 
-/**
- * Search ALL destinations in parallel.
- * @param {object} origin - Origin airport
- * @param {object[]} destinations - Destination list
- * @param {string[]} dates - Array of YYYY-MM-DD dates to scan
- */
-export async function searchAllDestinations(origin, destinations, dates) {
-  const tasks = destinations.map(async (dest) => {
-    let bestResult = null;
-
-    for (const date of dates) {
-      try {
-        const result = await searchDestination(origin, dest, date);
-        if (!bestResult || (result.cheapest && result.cheapest.price < bestResult.cheapest?.price)) {
-          bestResult = { ...result, bestDate: date };
-        }
-      } catch (e) {
-        console.error(`  [ERROR] ${dest.code} on ${date}: ${e.message}`);
-      }
-    }
-
-    return bestResult || {
-      destination: dest,
-      cheapest: null,
-      allResults: [],
-      links: {},
-      errors: ['All searches failed'],
-    };
-  });
-
-  return Promise.all(tasks);
+/** All destinations in parallel (Promise.all). One failure never stops the others. */
+export async function searchAllDestinations(origin, destinations, dates, window) {
+  return Promise.all(destinations.map(dest =>
+    searchDestination(origin, dest, dates, window).catch(e => {
+      console.error(`  [ERROR] ${dest.code}: ${e.message}`);
+      return {
+        destination: dest, cheapest: null, bestDate: dates[0], simulated: false, resultCount: 0, sources: [],
+        link: { label: 'Google Flights', url: buildLinks(origin, dest, dates[0])['Google Flights'] },
+        links: buildLinks(origin, dest, dates[0]), flags: [], errors: [e.message],
+      };
+    })
+  ));
 }

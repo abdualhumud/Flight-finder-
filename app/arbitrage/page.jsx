@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Globe, Shield, Plane, Calendar, Loader2, ExternalLink, Wifi } from 'lucide-react';
+import SimulationNotice from '../../components/SimulationNotice';
 import { useGeoArbitrage } from '../../lib/hooks/useFlightSearch';
 import { formatPrice, cn } from '../../lib/utils';
 import { generateAllLinks } from '../../lib/api/deepLinks';
@@ -97,6 +98,8 @@ export default function GeoArbitrage() {
           <p className="text-sm text-gray-400">{t('geo.scanning')}</p>
         </div>
       )}
+
+      {results?.some(r => r.simulated) && !isLoading && <SimulationNotice />}
 
       {results && !isLoading && (
         <>

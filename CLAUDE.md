@@ -206,6 +206,30 @@ Dates are stored as `YYYY-MM-DD` strings, not `Date` objects. Convert with `.spl
 7. **Entity IDs ≠ IATA codes for Skyscanner** — if flight searches silently return empty, check that `entityId` is resolved (not just the 3-letter code).
 8. **New user-visible strings → update `lib/i18n.jsx`** in both `en` and `ar` objects.
 
+## Price Integrity Rules (never break these)
+
+The user relies on this app to find the *real* cheapest fares. Fake or misleading prices are the worst possible bug.
+
+1. **Simulated flights must be flagged.** `simulateFlights` sets `source: 'simulated'` and `simulated: true`. Never tag simulated data with a real provider name (it used to show a green LIVE badge). `FlightTable` computes `isLive` as `!flight.simulated && source ∈ {amadeus, skyscanner}`.
+2. **Show `<SimulationNotice />`** on any page that can display simulated prices (Mission Control, Search, Arbitrage).
+3. **No fabricated pagination or price changes.** The old "load more" re-requested the same data and inflated prices 2% per page; it was removed.
+4. **Always discard** `price <= 0`, non-finite, and (stalker) non-SAR results before ranking. A `0` must never become "the lowest fare".
+5. **Skyscanner (Sky Scrapper) params:** `market` = locale (`en-US`), `countryCode` = POS country (`SA`, `IN`…). Put the country in `market` and the POS is silently ignored.
+6. **Skyscanner entity IDs in `data/airports.js` are not verified** (3 duplicate IDs exist). The stalker resolves IDs live via `searchAirport` and only falls back to the static table (and reports it).
+
+## Daily Flight Stalker (`scripts/daily-stalker/`)
+
+Standalone Node ESM package (NOT part of the Next.js build). Run by `.github/workflows/daily-stalker.yml`.
+
+- **Schedule:** `cron: '0 22 * * *'` = 01:00 Riyadh (UTC+3). GitHub cron is UTC-only, can lag 5–30 min, and **only runs from the default branch (`main`)**.
+- **Sources:** Skyscanner (RapidAPI) + Amadeus are real price sources. Google Flights / Trip.com have no public price API → deep links only.
+- **Simulation is OFF by default** (`ALLOW_SIMULATION=true` for demos). Live and simulated data are never mixed; estimates are labelled in the email and subject.
+- **Quota safety:** global concurrency limiter (`CONCURRENCY`), retry/backoff on 429/5xx, hard cap `SKYSCANNER_MAX_CALLS`. Amadeus uses one calendar call per destination (`/v1/shopping/flight-dates`) then prices the 2 cheapest days.
+- **Amadeus env:** free keys only work on the test host → `AMADEUS_ENV=test`.
+- **Errors are surfaced**, never swallowed: they appear in the log and the email banner. API keys never appear in error text.
+- **Secrets:** GitHub Actions secrets `RAPIDAPI_KEY, AMADEUS_API_KEY, AMADEUS_API_SECRET, SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, EMAIL_TO`; optional repo *variables* `AMADEUS_ENV, ALLOW_SIMULATION, SKYSCANNER_MAX_CALLS`.
+- **Test locally:** `cd scripts/daily-stalker && npm ci && DRY_RUN=true node index.js` → writes `report.html`.
+
 ## Working Branch
 
 All development happens on `claude/travel-intelligence-dashboard-W2m1f`. Commits go there; CI deploys to GitHub Pages from `main` after merge.

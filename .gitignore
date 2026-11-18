@@ -5,3 +5,6 @@ out
 .env
 .env.local
 .DS_Store
+
+# daily-stalker local output
+scripts/daily-stalker/report.html

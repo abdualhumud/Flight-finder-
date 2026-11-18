@@ -20,7 +20,7 @@ function FlightRow({ flight, rank }) {
   const vs = flight.valueScore || calculateValueScore(flight);
   const rating = getValueRating(vs);
   const savings = flight.originalPrice ? Math.round(((flight.originalPrice - flight.price) / flight.originalPrice) * 100) : 0;
-  const isLive = flight.source === 'amadeus' || flight.source === 'skyscanner';
+  const isLive = !flight.simulated && (flight.source === 'amadeus' || flight.source === 'skyscanner');
   const sourceLabels = {
     amadeus: 'Amadeus',
     skyscanner: 'Skyscanner',

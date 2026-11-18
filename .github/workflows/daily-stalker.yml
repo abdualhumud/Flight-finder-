@@ -2,8 +2,9 @@ name: Daily Flight Stalker
 
 on:
   schedule:
-    # Runs every day at 01:00 AM UTC (04:00 AM Riyadh / AST)
-    - cron: '0 1 * * *'
+    # GitHub cron is always UTC. Riyadh is UTC+3 (no DST) → 01:00 AM Riyadh = 22:00 UTC the day before.
+    # GitHub may delay scheduled runs by 5–30 min under load; that is normal.
+    - cron: '0 22 * * *'
   workflow_dispatch:
     inputs:
       dry_run:
@@ -14,6 +15,13 @@ on:
         options:
           - 'false'
           - 'true'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: daily-stalker
+  cancel-in-progress: false
 
 jobs:
   stalk:
@@ -44,5 +52,15 @@ jobs:
           SMTP_USER: ${{ secrets.SMTP_USER }}
           SMTP_PASS: ${{ secrets.SMTP_PASS }}
           EMAIL_TO: ${{ secrets.EMAIL_TO }}
+          AMADEUS_ENV: ${{ vars.AMADEUS_ENV }}
+          ALLOW_SIMULATION: ${{ vars.ALLOW_SIMULATION }}
+          SKYSCANNER_MAX_CALLS: ${{ vars.SKYSCANNER_MAX_CALLS }}
           DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
         run: node index.js
+
+      - name: Upload report (dry-run preview)
+        if: ${{ github.event.inputs.dry_run == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: report
+          path: scripts/daily-stalker/report.html

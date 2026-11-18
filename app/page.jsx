@@ -3,6 +3,7 @@
 import { useState, useMemo } from 'react';
 import { Radar, TrendingDown, Zap, Tag, Filter, ArrowUpDown, AlertTriangle, RefreshCw, Loader2 } from 'lucide-react';
 import FlightTable from '../components/FlightTable';
+import SimulationNotice from '../components/SimulationNotice';
 import { useLiveDeals } from '../lib/hooks/useFlightSearch';
 import { calculateValueScore } from '../lib/utils';
 import { useI18n } from '../lib/i18n';
@@ -124,6 +125,8 @@ export default function MissionControl() {
           ))}
         </div>
       </div>
+
+      {deals.some(d => d.simulated) && <SimulationNotice />}
 
       <FlightTable flights={filtered} loading={isLoading} />
     </div>
